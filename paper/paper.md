@@ -117,6 +117,6 @@ All library code, benchmark results, and text were reviewed and verified by the 
 
 # Acknowledgements
 
-We thank The C++ Alliance for sponsoring this work, the domain experts who peer-reviewed the library in July 2026 before its acceptance into the Boost library collection, and Arnaud Bechler for managing that review.
+We thank The C++ Alliance for sponsoring this work, the domain experts who peer-reviewed the library in July 2026 before its acceptance into the Boost library collection, and Arnaud Becheler for managing that review.
 
 # References
