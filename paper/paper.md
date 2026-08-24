@@ -101,14 +101,14 @@ int main()
 
 # Research Impact Statement
 
-Boost.Int128 supports reproducible numerical research wherever 64 bits of integer precision are not enough.
-Computational number theory, cryptography, and hashing reduce products of 64-bit residues and need the full 128-bit intermediate, as do combinatorial enumeration and exact sums of products.
-Because the same type gives the same results on every architecture, big-endian or little-endian, and with or without a native 128-bit type underneath, a result computed on one machine is bit-for-bit reproducible on another.
+As a component distributed through the Boost libraries, Boost.int128 is trivially in the reach of researchers everywhere.
 
-The device support extends that guarantee to accelerators.
-A researcher can port a kernel to a GPU without substituting a numeric type and can validate the port against the host because the two agree by specification.
-Replacing a floating-point accumulator with a 128-bit integer one makes a parallel reduction independent of how the work is partitioned, since integer addition is associative.
-Supporting both CUDA and SYCL means this holds across vendors.
+Boost.int128 serves as the arithmetic backend to the Boost Decimal Library [@Borland2026].
+Using Boost.int128 is what allowed Boost.Decimal to be portable beyond the platforms served by competing libraries, for example, on Apple's ARM64.
+It also allowed portability to CUDA, enabling quantitative finance researchers to process data at much larger scales than previously available.
+
+The Boost Graph Library [@bgl] already relies on 128-bit integers for exact geometry, using `int128` in is_straight_line_drawing to compute overflow-free orientation determinants, 
+showing that a dedicated Boost.Int128 would directly serve computational-geometry and planarity research with applications in VLSI circuit layout, graph visualization, network/map drawing, and GIS.
 
 # AI usage disclosure
 
