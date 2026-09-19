@@ -1,4 +1,4 @@
-# Contributing to Boost.Graph
+# Contributing to Boost.int128
 
 ## We are welcoming contributions
 
