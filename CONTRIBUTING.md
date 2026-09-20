@@ -22,9 +22,9 @@ git submodule update --init --depth 1
 Then replace `libs/int128/` with your fork:
 
 ```bash
-rm -rf libs/graph
+rm -rf libs/int128
 git clone https://github.com/<you>/int128 libs/int128
-cd libs/graph
+cd libs/int128
 git remote add upstream https://github.com/boostorg/int128
 ```
 
