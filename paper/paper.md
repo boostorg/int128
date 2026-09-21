@@ -61,6 +61,7 @@ More than eighty CUDA and eighty SYCL tests compare device results against the h
 Where a native type exists, Boost.Int128 matches or beats it: with GCC 14.2 on Linux x86_64, `uint128` division and modulo are roughly 16 percent faster than `unsigned __int128`, and signed multiplication is 1.5 times faster on big-endian s390x.
 Where no native type exists, the margins are larger: signed multiplication is 1.7 times faster than `std::_Signed128` on MSVC x86_64 and 6.2 times faster on MSVC ARM64, and 32-bit x86 addition is 8 times faster than Boost.Multiprecision.
 A handful of cells favor an alternative, so the complete tables, rerun on every pull request, are published rather than a summary, at <https://develop.int128.cpp.al/int128/u128_benchmarks.html> and <https://develop.int128.cpp.al/int128/i128_benchmarks.html>.
+To enable reproducibility, information on how to run the benchmarks locally as well as run our provided analysis scripts can be found on the same benchmark pages under the "Running the Benchmarks" heading.
 
 Figure 1 shows the difference between a 64-bit and a 128-bit product.
 
