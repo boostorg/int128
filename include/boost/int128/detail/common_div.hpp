@@ -309,6 +309,9 @@ namespace impl {
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable : 4127) // Pre c++17 the if constexpr remainder part will hit this
+#elif defined(__GNUC__) && __GNUC__ == 5
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
 
 // See: The Art of Computer Programming Volume 2 (Semi-numerical algorithms) section 4.3.1
@@ -434,6 +437,8 @@ BOOST_INT128_HOST_DEVICE constexpr void knuth_divide(std::uint32_t (&u)[u_size],
 
 #if defined(_MSC_VER)
 #  pragma warning(pop)
+#elif defined(__GNUC__) && __GNUC__ == 5
+#  pragma GCC diagnostic pop
 #endif
 
 template <typename T>
