@@ -45,6 +45,10 @@ BOOST_INT128_HOST_DEVICE constexpr int128 operator ""_I128(const char* str, std:
 
 The macros at the end allow you to write out a 128-bit number like you would with say `UINT64_C` without having to add quotes.
 
+The operators are `noexcept`.
+A malformed or out-of-range literal used in a constant expression is a compile-time error.
+One that is only evaluated at run time, for example by calling the string form with a run-time string, has no value to return and terminates the program.
+
 == Bases
 
 The literals accept the standard C++ integer base prefixes in addition to plain decimal.

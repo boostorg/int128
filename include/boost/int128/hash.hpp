@@ -57,7 +57,8 @@ struct hash<boost::int128::int128>
         const std::size_t high_hash {boost::int128::detail::hash_finalize_64(v.high)};
 
         // boost::hash_combine style mixing of the two finalized halves
-        return low_hash ^ (high_hash + static_cast<std::size_t>(0x9e3779b9) + (low_hash << 6) + (low_hash >> 2));
+        constexpr std::size_t golden_ratio {0x9e3779b9U};
+        return low_hash ^ (high_hash + golden_ratio + (low_hash << 6) + (low_hash >> 2));
     }
 };
 
@@ -70,7 +71,8 @@ struct hash<boost::int128::uint128>
         const std::size_t high_hash {boost::int128::detail::hash_finalize_64(v.high)};
 
         // boost::hash_combine style mixing of the two finalized halves
-        return low_hash ^ (high_hash + static_cast<std::size_t>(0x9e3779b9) + (low_hash << 6) + (low_hash >> 2));
+        constexpr std::size_t golden_ratio {0x9e3779b9U};
+        return low_hash ^ (high_hash + golden_ratio + (low_hash << 6) + (low_hash >> 2));
     }
 };
 

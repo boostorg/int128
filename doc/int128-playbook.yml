@@ -5,7 +5,7 @@ content:
   sources:
     - url: ..
       start_path: doc
-      edit_url: 'https://github.com/cppalliance/int128/edit/develop/{path}'
+      edit_url: 'https://github.com/boostorg/int128/edit/develop/{path}'
 output:
   dir: html
 ui:

@@ -50,6 +50,10 @@ The base flags (`std::oct`, `std::dec`, `std::hex`) affect both input and output
 - `std::showbase` - Adds a leading base prefix for hex or oct numbers on output (e.g. 0xffff)
 - `std::noshowbase` - Omits the leading base prefix on output (e.g. ffff)
 
-On extraction (`operator>>`) a leading `0x` or `0` base prefix is accepted and consumed for the active base regardless of `showbase`, and hexadecimal input is parsed case-insensitively.
+On extraction (`operator>>`) with `std::hex` a leading `0x` or `0X` prefix is accepted and consumed regardless of `showbase`, and the digits are parsed case-insensitively.
+A bare leading zero is an ordinary digit in every base, so `0f` in hexadecimal is 15 and `017` in octal is 15.
+Extraction stops at the first character that is not a digit in the active base and leaves it in the stream.
+If no digit could be extracted, or the value does not fit in the target type, `failbit` is set, the target is set to zero, and every character is left in the stream, so `while (is >> value)` terminates as it does for the builtin integer types.
+On insertion (`operator<<`) `showbase` adds no prefix to a zero, again matching the builtin types.
 
 See the xref:examples.adoc#examples_io[IO streaming example] for usage demonstrations.

@@ -284,7 +284,10 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 gcd(uint128 a, ui
     a >>= shift;
     b >>= shift;
 
-    do
+    // The invariant of the loop below is that a is odd
+    a >>= countr_zero(a);
+
+    while (true)
     {
         b >>= countr_zero(b);
 
@@ -296,11 +299,20 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 gcd(uint128 a, ui
         }
 
         b -= a;
-    } while (b != 0U && (a.high | b.high) > 0U);
 
-    // Stop doing 128-bit math as soon as we can
-    const auto g {detail::gcd64(a.low, b.low)};
-    return uint128{0, g} << shift;
+        // The result is a itself, whatever its width: dropping to gcd64 here would
+        // discard a.high (gcd(2^64 + 1, 2^64 + 1) used to return 1)
+        if (b == 0U)
+        {
+            return a << shift;
+        }
+
+        // Stop doing 128-bit math as soon as we can
+        if ((a.high | b.high) == UINT64_C(0))
+        {
+            return uint128{0, detail::gcd64(a.low, b.low)} << shift;
+        }
+    }
 }
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 gcd(const int128 a, const int128 b) noexcept

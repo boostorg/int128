@@ -1229,50 +1229,48 @@ namespace impl {
 #if defined(_MSC_VER)
 #  pragma warning(push)
 #  pragma warning(disable : 4127) // Pre c++17 the if constexpr remainder part will hit this
+#elif defined(__GNUC__) && __GNUC__ == 5
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
-
-template <std::size_t v_size>
-BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr void unpack_v(std::uint32_t (&vn)[4], const std::uint32_t (&v)[v_size],
-    const bool needs_shift, const int s, const int complement_s, const std::integral_constant<std::size_t, 2>&) noexcept
-{
-    vn[1] = needs_shift ? ((v[1] << s) | (v[0] >> complement_s)) : v[1];
-    vn[0] = needs_shift ? (v[0] << s) : v[0];
-}
-
-template <std::size_t v_size>
-BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr void unpack_v(std::uint32_t (&vn)[4], const std::uint32_t (&v)[v_size],
-    const bool needs_shift, const int s, const int complement_s, const std::integral_constant<std::size_t, 4>&) noexcept
-{
-    vn[3] = needs_shift ? ((v[3] << s) | (v[2] >> complement_s)) : v[3];
-    vn[2] = needs_shift ? ((v[2] << s) | (v[1] >> complement_s)) : v[2];
-    vn[1] = needs_shift ? ((v[1] << s) | (v[0] >> complement_s)) : v[1];
-    vn[0] = needs_shift ? (v[0] << s) : v[0];
-}
 
 // See: The Art of Computer Programming Volume 2 (Semi-numerical algorithms) section 4.3.1
 // Algorithm D: Division of Non-negative integers
+//
+// Divides the m word dividend u by the n word divisor v (m >= n >= 2, v[n - 1] != 0) on 32-bit words
+// and writes the quotient to q. With need_remainder the remainder is left in u, otherwise u is scratch.
+// The word counts are template parameters so the same routine serves 128-bit operands here and the
+// 256-bit operands of Boost.Decimal.
 template <bool need_remainder, std::size_t u_size, std::size_t v_size, std::size_t q_size>
 BOOST_INT128_HOST_DEVICE constexpr void knuth_divide(std::uint32_t (&u)[u_size], const std::size_t m,
                             const std::uint32_t (&v)[v_size], const std::size_t n,
                             std::uint32_t (&q)[q_size]) noexcept
 {
-    // D.1
+    static_assert(v_size >= 2, "Algorithm D needs at least two divisor words");
+    static_assert(u_size >= v_size, "The dividend can not be narrower than the divisor");
+    static_assert(q_size >= u_size, "The quotient buffer must be as wide as the dividend");
+
+    // D.1: normalize so the top word of the divisor has its most significant bit set
     const auto s {countl_zero(v[n - 1])};
     const auto complement_s {32 - s};
     const bool needs_shift {s > 0};
 
     // Create normalized versions of u and v
-    std::uint32_t un[5] {};
-    std::uint32_t vn[4] {};
+    std::uint32_t un[u_size + 1] {};
+    std::uint32_t vn[v_size] {};
 
-    un[4] = needs_shift ? (u[3] >> complement_s) : 0;
-    un[3] = needs_shift ? ((u[3] << s) | (u[2] >> complement_s)) : u[3];
-    un[2] = needs_shift ? ((u[2] << s) | (u[1] >> complement_s)) : u[2];
-    un[1] = needs_shift ? ((u[1] << s) | (u[0] >> complement_s)) : u[1];
+    for (std::size_t i {n - 1}; i > 0; --i)
+    {
+        vn[i] = needs_shift ? ((v[i] << s) | (v[i - 1] >> complement_s)) : v[i];
+    }
+    vn[0] = needs_shift ? (v[0] << s) : v[0];
+
+    un[m] = needs_shift ? (u[m - 1] >> complement_s) : 0;
+    for (std::size_t i {m - 1}; i > 0; --i)
+    {
+        un[i] = needs_shift ? ((u[i] << s) | (u[i - 1] >> complement_s)) : u[i];
+    }
     un[0] = needs_shift ? (u[0] << s) : u[0];
-
-    static_assert(v_size == 4 || v_size == 2, "Unknown size for denominator");
-    unpack_v(vn, v, needs_shift, s, complement_s, std::integral_constant<std::size_t, v_size>{});
 
     // D.2
     for (std::size_t j {m - n}; j != static_cast<std::size_t>(-1); --j)
@@ -1359,6 +1357,8 @@ BOOST_INT128_HOST_DEVICE constexpr void knuth_divide(std::uint32_t (&u)[u_size],
 
 #if defined(_MSC_VER)
 #  pragma warning(pop)
+#elif defined(__GNUC__) && __GNUC__ == 5
+#  pragma GCC diagnostic pop
 #endif
 
 template <typename T>
@@ -1988,21 +1988,6 @@ BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr int128 from_bits(co
 }
 
 } // namespace detail
-
-//=====================================
-// Absolute Value function
-//=====================================
-
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 abs(int128 value) noexcept
-{
-    if (value.signed_high() < 0)
-    {
-        value.low = ~value.low + 1U;
-        value.high = ~value.high + static_cast<std::uint64_t>(value.low == 0 ? 1 : 0);
-    }
-    
-    return value;
-}
 
 //=====================================
 // Float Conversion Operators
@@ -3647,6 +3632,21 @@ BOOST_INT128_HOST_DEVICE inline int128& int128::operator-=(const Integer rhs) no
 }
 
 #endif // BOOST_INT128_HAS_MSVC_INT128
+
+//=====================================
+// Absolute Value function
+//=====================================
+
+// Branch-free two's complement absolute value: (x ^ mask) - mask, where mask is all
+// ones for a negative value and zero otherwise. abs(min()) is min(), which matches the
+// behavior of the builtin signed integer types.
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 abs(const int128 value) noexcept
+{
+    const auto sign_word {static_cast<std::uint64_t>(value.signed_high() >> 63)};
+    const auto mask {detail::from_bits(sign_word, sign_word)};
+
+    return (value ^ mask) - mask;
+}
 
 //=====================================
 // Multiplication Operators
@@ -8775,6 +8775,12 @@ BOOST_INT128_HOST_DEVICE constexpr int from_chars_integer_impl(const char* first
         return EINVAL;
     }
 
+    // A base outside 2..36 has no digit set; base 0 would divide by zero below
+    if (base < 2 || base > 36)
+    {
+        return EINVAL;
+    }
+
     Unsigned_Integer result {};
     Unsigned_Integer overflow_value {};
     Unsigned_Integer max_digit {};
@@ -8906,6 +8912,13 @@ BOOST_INT128_HOST_DEVICE constexpr int from_chars_integer_impl(const char* first
         return EDOM;
     }
 
+    // Nothing consumed means the first character was not a digit in this base. The
+    // output is left untouched, as std::from_chars specifies, and 0 is returned.
+    if (next == first || (is_negative && next == first + 1))
+    {
+        return 0;
+    }
+
     value = static_cast<Integer>(result);
 
     BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Integer>::is_signed)
@@ -8986,10 +8999,12 @@ BOOST_int128EST_EXPORT BOOST_INT128_HOST_DEVICE constexpr int from_chars_literal
 // Parse a user-defined literal, hard-failing on any malformed or out-of-range input.
 // A C++ base prefix (0x/0X hex, 0b/0B binary, or a leading 0 for octal) is stripped and
 // the digits parsed in that base, otherwise handled as base 10
+// A malformed or out-of-range literal is a compile-time error in a constant expression and
+// terminates the program at run time (the reporters throw out of this noexcept function).
 template <typename Integer>
 BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, const char* last) noexcept
 {
-    Integer value {};
+    Integer parse_value {};
 
     // A leading sign stays with the digits; a base prefix, if present, follows it.
     auto next = first;
@@ -9029,7 +9044,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
     // Overflow is reported as EDOM; anything else short of full consumption is malformed.
     if (!prefixed)
     {
-        const auto status = from_chars_literal(first, last, value);
+        const auto status = from_chars_literal(first, last, parse_value);
         if (status == EDOM)
         {
             BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
@@ -9039,11 +9054,11 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
             BOOST_INT128_REJECT_LITERAL(parse_invalid_literal);
         }
 
-        return value;
+        return parse_value;
     }
 
     // Prefixed: parse the magnitude in the detected base, then reapply the sign.
-    const auto status = from_chars_literal(next, last, value, base);
+    const auto status = from_chars_literal(next, last, parse_value, base);
     if (status == EDOM)
     {
         BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
@@ -9057,7 +9072,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
     {
         BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Integer>::is_signed)
         {
-            value = static_cast<Integer>(-value);
+            parse_value = static_cast<Integer>(-parse_value);
         }
         else
         {
@@ -9065,7 +9080,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
         }
     }
 
-    return value;
+    return parse_value;
 }
 
 } // namespace detail
@@ -9279,6 +9294,11 @@ BOOST_INT128_INLINE_CONSTEXPR bool is_streamable_overload_v = streamable_overloa
 
 } // namespace detail
 
+#if defined(__GNUC__) && __GNUC__ >= 5 && __GNUC__ < 11
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+
 BOOST_INT128_EXPORT template <typename charT, typename traits, typename LibIntegerType>
 auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
     -> std::enable_if_t<detail::is_streamable_overload_v<LibIntegerType>, std::basic_istream<charT, traits>&>
@@ -9311,26 +9331,36 @@ auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
     int base {10};
     if (flags & std::ios_base::oct)
     {
+        // No prefix is stripped: in base 8 a leading zero is already an ordinary digit,
+        // so "017" reads as 15 and "08" reads as 0 leaving the '8' in the stream, which
+        // is what num_get does for the builtin types.
         base = 8;
-        if (*buffer_start == '0')
-        {
-            ++buffer_start;
-        }
     }
     else if (flags & std::ios_base::hex)
     {
         base = 16;
-        if (*buffer_start == '0')
+
+        // Skip an explicit 0x or 0X prefix, and never a bare leading zero, which
+        // would swallow the first digit of a value such as 0f
+        if (buffer_start[0] == '0' && (buffer_start[1] == 'x' || buffer_start[1] == 'X'))
         {
             buffer_start += 2;
         }
     }
 
+    const auto prefix_length {static_cast<std::size_t>(buffer_start - buffer)};
+
     const auto r {detail::from_chars(buffer_start, buffer + detail::strlen(buffer), v, base)};
 
-    // Put back unconsumed characters
-    // If r is greater than 0 then an errno values has been hit
-    const auto consumed {static_cast<std::size_t>(r > 0 ? 0 : -r)};
+    // Put back unconsumed characters. Only a strictly negative r means digits were
+    // extracted, and then -r digits were consumed on top of any base prefix. Anything
+    // else consumed nothing at all, so even the prefix goes back.
+    std::size_t consumed {};
+    if (r < 0)
+    {
+        consumed = prefix_length + static_cast<std::size_t>(-r);
+    }
+
     BOOST_INT128_ASSERT(t_buffer_len >= consumed);
     const auto return_chars {static_cast<std::size_t>(t_buffer_len - consumed)};
 
@@ -9339,8 +9369,24 @@ auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
         is.putback(t_buffer[t_buffer_len - i - 1]);
     }
 
+    // from_chars returns the negated number of characters consumed on success, so
+    // anything not negative means no digits were extracted: r == 0 is a first
+    // character that is not a digit in the base, and r > 0 is an errno value
+    // (EINVAL for an empty input or a sign, EDOM for a value that does not fit).
+    // The stream has to report all of those as a failure. This must come after the
+    // putback loop: putback fails its own sentry once failbit is set.
+    if (r >= 0)
+    {
+        v = LibIntegerType{};
+        is.setstate(std::ios_base::failbit);
+    }
+
     return is;
 }
+
+#if defined(__GNUC__) && __GNUC__ >= 5 && __GNUC__ < 11
+#  pragma GCC diagnostic pop
+#endif
 
 BOOST_INT128_EXPORT template <typename charT, typename traits, typename LibIntegerType>
 auto operator<<(std::basic_ostream<charT, traits>& os, const LibIntegerType& v)
@@ -9367,7 +9413,8 @@ auto operator<<(std::basic_ostream<charT, traits>& os, const LibIntegerType& v)
 
     auto first {detail::mini_to_chars(buffer, v, base, uppercase)};
 
-    if (flags & std::ios_base::showbase)
+    // A zero prints as a bare "0" with showbase, the same as the builtin types
+    if ((flags & std::ios_base::showbase) && v != 0U)
     {
         if (base == 8)
         {
@@ -9768,7 +9815,7 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 powm(const int128 
     {
         const uint128 magnitude {static_cast<uint128>(abs(base))};
         const uint128 r {magnitude % um};
-        ub = r == 0U ? uint128{0} : static_cast<uint128>(um - r);
+        ub = r == 0U ? uint128{0} : um - r;
     }
     else
     {
@@ -10471,7 +10518,10 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 gcd(uint128 a, ui
     a >>= shift;
     b >>= shift;
 
-    do
+    // The invariant of the loop below is that a is odd
+    a >>= countr_zero(a);
+
+    while (true)
     {
         b >>= countr_zero(b);
 
@@ -10483,11 +10533,20 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 gcd(uint128 a, ui
         }
 
         b -= a;
-    } while (b != 0U && (a.high | b.high) > 0U);
 
-    // Stop doing 128-bit math as soon as we can
-    const auto g {detail::gcd64(a.low, b.low)};
-    return uint128{0, g} << shift;
+        // The result is a itself, whatever its width: dropping to gcd64 here would
+        // discard a.high (gcd(2^64 + 1, 2^64 + 1) used to return 1)
+        if (b == 0U)
+        {
+            return a << shift;
+        }
+
+        // Stop doing 128-bit math as soon as we can
+        if ((a.high | b.high) == UINT64_C(0))
+        {
+            return uint128{0, detail::gcd64(a.low, b.low)} << shift;
+        }
+    }
 }
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 gcd(const int128 a, const int128 b) noexcept
@@ -11288,9 +11347,12 @@ struct formatter<T>
         const auto end = boost::int128::detail::mini_to_chars(buffer, abs_v, base, is_upper);
         std::string s(end, buffer + sizeof(buffer));
 
+        // The alternate form never adds an octal prefix to a zero: std::format("{:#o}", 0) is "0"
+        const bool add_prefix {prefix && !(base == 8 && abs_v == 0U)};
+
         // Calculate prefix length that will be added later
         std::size_t prefix_len {0};
-        if (prefix)
+        if (add_prefix)
         {
             switch (base)
             {
@@ -11333,7 +11395,7 @@ struct formatter<T>
             }
         }
 
-        if (prefix)
+        if (add_prefix)
         {
             switch (base)
             {
@@ -11586,7 +11648,8 @@ struct hash<boost::int128::int128>
         const std::size_t high_hash {boost::int128::detail::hash_finalize_64(v.high)};
 
         // boost::hash_combine style mixing of the two finalized halves
-        return low_hash ^ (high_hash + static_cast<std::size_t>(0x9e3779b9) + (low_hash << 6) + (low_hash >> 2));
+        constexpr std::size_t golden_ratio {0x9e3779b9U};
+        return low_hash ^ (high_hash + golden_ratio + (low_hash << 6) + (low_hash >> 2));
     }
 };
 
@@ -11599,7 +11662,8 @@ struct hash<boost::int128::uint128>
         const std::size_t high_hash {boost::int128::detail::hash_finalize_64(v.high)};
 
         // boost::hash_combine style mixing of the two finalized halves
-        return low_hash ^ (high_hash + static_cast<std::size_t>(0x9e3779b9) + (low_hash << 6) + (low_hash >> 2));
+        constexpr std::size_t golden_ratio {0x9e3779b9U};
+        return low_hash ^ (high_hash + golden_ratio + (low_hash << 6) + (low_hash >> 2));
     }
 };
 

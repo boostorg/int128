@@ -18,6 +18,7 @@ import boost.int128;
 
 #include <boost/core/lightweight_test.hpp>
 #include <limits>
+#include <string>
 
 using namespace boost::int128::literals;
 
@@ -166,9 +167,26 @@ void test_i128_base_prefixes()
     #endif
 }
 
-#ifdef _MSC_VER
-#  pragma warning(pop)
-#endif
+// The literal operators are noexcept: a malformed or out-of-range literal is a compile-time
+// error in a constant expression (compile_tests pin that) and terminates at run time. A
+// value that fits still parses at run time through the string form.
+void test_noexcept_contract()
+{
+    static_assert(noexcept(boost::int128::literals::operator ""_u128("0")), "literal operators are noexcept");
+    static_assert(noexcept(boost::int128::literals::operator ""_U128("0")), "literal operators are noexcept");
+    static_assert(noexcept(boost::int128::literals::operator ""_i128("0")), "literal operators are noexcept");
+    static_assert(noexcept(boost::int128::literals::operator ""_I128("0")), "literal operators are noexcept");
+    static_assert(noexcept(boost::int128::literals::operator ""_u128("0", 1U)), "literal operators are noexcept");
+    static_assert(noexcept(boost::int128::literals::operator ""_i128("0", 1U)), "literal operators are noexcept");
+
+    const std::string max_str {"340282366920938463463374607431768211455"};
+    const auto max_val {boost::int128::literals::operator ""_u128(max_str.c_str(), max_str.size())};
+    BOOST_TEST(max_val == std::numeric_limits<boost::int128::uint128>::max());
+
+    const std::string min_str {"-170141183460469231731687303715884105728"};
+    const auto min_val {boost::int128::literals::operator ""_i128(min_str.c_str(), min_str.size())};
+    BOOST_TEST(min_val == std::numeric_limits<boost::int128::int128>::min());
+}
 
 int main()
 {
@@ -178,6 +196,7 @@ int main()
     test_i128_literals();
     test_i128_digit_separators();
     test_i128_base_prefixes();
+    test_noexcept_contract();
 
     return boost::report_errors();
 }

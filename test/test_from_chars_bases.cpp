@@ -235,6 +235,53 @@ void test_invalid_inputs()
     }
 }
 
+// A parse that consumes nothing returns 0 and leaves the output untouched, an overflow
+// returns EDOM and also leaves it untouched, and a base outside 2..36 is EINVAL
+void test_failure_contract()
+{
+    {
+        const std::string s {"abc"};
+        uint128 v {UINT64_C(0xDEADBEEF)};
+        const auto r {boost::int128::detail::from_chars(s.data(), s.data() + s.size(), v)};
+        BOOST_TEST_EQ(r, 0);
+        BOOST_TEST(v == uint128{UINT64_C(0xDEADBEEF)});
+    }
+
+    {
+        const std::string s {"zz"};
+        int128 v {42};
+        const auto r {boost::int128::detail::from_chars(s.data(), s.data() + s.size(), v, 16)};
+        BOOST_TEST_EQ(r, 0);
+        BOOST_TEST(v == int128{42});
+    }
+
+    // A sign followed by a non digit consumes nothing either
+    {
+        const std::string s {"-x"};
+        int128 v {42};
+        const auto r {boost::int128::detail::from_chars(s.data(), s.data() + s.size(), v)};
+        BOOST_TEST_EQ(r, 0);
+        BOOST_TEST(v == int128{42});
+    }
+
+    {
+        const std::string s {"340282366920938463463374607431768211456"};
+        uint128 v {7};
+        const auto r {boost::int128::detail::from_chars(s.data(), s.data() + s.size(), v)};
+        BOOST_TEST_EQ(r, EDOM);
+        BOOST_TEST(v == uint128{7});
+    }
+
+    for (const int base : {0, 1, 37, -1})
+    {
+        const std::string s {"11"};
+        uint128 v {7};
+        const auto r {boost::int128::detail::from_chars(s.data(), s.data() + s.size(), v, base)};
+        BOOST_TEST_EQ(r, EINVAL);
+        BOOST_TEST(v == uint128{7});
+    }
+}
+
 } // anonymous namespace
 
 int main()
@@ -243,6 +290,7 @@ int main()
     test_int128_all_bases();
     test_decimal_boundaries();
     test_invalid_inputs();
+    test_failure_contract();
 
     return boost::report_errors();
 }

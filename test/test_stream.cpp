@@ -7,6 +7,8 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <string>
+#include <limits>
 #include <random>
 
 #ifdef __clang__
@@ -292,13 +294,220 @@ void test_round_trip<boost::int128::int128>()
 #  pragma warning(pop)
 #endif
 
+// Extraction must report failure through the stream state, zero the value, and put
+// every character back, so that the idiomatic while (is >> v) loop terminates
+template <typename T>
+void test_istream_failures()
+{
+    // A first character that is not a digit
+    {
+        std::stringstream in;
+        in.str("abc def");
+        T v {static_cast<T>(7)};
+        int iterations {};
+        while (iterations < 1000 && (in >> v))
+        {
+            ++iterations;
+        }
+        BOOST_TEST_EQ(iterations, 0);
+        BOOST_TEST(in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(0));
+
+        in.clear();
+        std::string rest;
+        in >> rest;
+        BOOST_TEST_CSTR_EQ(rest.c_str(), "abc");
+    }
+
+    // Overflow: 2^128 fits neither type
+    {
+        std::stringstream in;
+        in.str("340282366920938463463374607431768211456");
+        T v {static_cast<T>(7)};
+        in >> v;
+        BOOST_TEST(in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(0));
+    }
+
+    // Digits that are not valid in the active base
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::hex);
+        in.str("zz");
+        T v {static_cast<T>(7)};
+        in >> v;
+        BOOST_TEST(in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(0));
+
+        in.clear();
+        std::string rest;
+        in >> rest;
+        BOOST_TEST_CSTR_EQ(rest.c_str(), "zz");
+    }
+
+    // Empty input
+    {
+        std::stringstream in;
+        in.str("");
+        T v {static_cast<T>(7)};
+        in >> v;
+        BOOST_TEST(in.fail());
+    }
+
+    // A sign parses on the signed type and is a failure on the unsigned one
+    {
+        std::stringstream in;
+        in.str("-5");
+        T v {static_cast<T>(7)};
+        in >> v;
+
+        BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<T>::is_signed)
+        {
+            BOOST_TEST(!in.fail());
+            BOOST_TEST_EQ(v, static_cast<T>(-5));
+        }
+        else
+        {
+            BOOST_TEST(in.fail());
+            BOOST_TEST_EQ(v, static_cast<T>(0));
+        }
+    }
+}
+
+// Only a real 0x or 0X prefix is skipped in hex, a bare leading zero is a digit in every
+// base, and whatever was consumed (prefix included) does not come back
+template <typename T>
+void test_istream_prefixes()
+{
+    // Hex "0" is the value zero with nothing left over
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::hex);
+        in.str("0");
+        T v {static_cast<T>(7)};
+        in >> v;
+        BOOST_TEST(!in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(0));
+
+        in.clear();
+        std::string rest;
+        in >> rest;
+        BOOST_TEST(rest.empty());
+    }
+
+    // Hex "0f" is 15: the leading zero is a digit, not a prefix
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::hex);
+        in.str("0f");
+        T v {};
+        in >> v;
+        BOOST_TEST(!in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(15));
+    }
+
+    // Hex "0x1fz" is 31 and only the z remains in the stream
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::hex);
+        in.str("0x1fz");
+        T v {};
+        in >> v;
+        BOOST_TEST(!in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(31));
+
+        std::string rest;
+        in >> rest;
+        BOOST_TEST_CSTR_EQ(rest.c_str(), "z");
+    }
+
+    // Uppercase prefix
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::hex);
+        in.str("0X1F");
+        T v {};
+        in >> v;
+        BOOST_TEST(!in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(31));
+    }
+
+    // Octal "017" is 15 and fully consumed
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::oct);
+        in.str("017");
+        T v {};
+        in >> v;
+        BOOST_TEST(!in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(15));
+
+        in.clear();
+        std::string rest;
+        in >> rest;
+        BOOST_TEST(rest.empty());
+    }
+
+    // Octal "08" is 0 with the 8 left in the stream, as num_get does for the builtins
+    {
+        std::stringstream in;
+        in.flags(std::ios_base::oct);
+        in.str("08");
+        T v {static_cast<T>(7)};
+        in >> v;
+        BOOST_TEST(!in.fail());
+        BOOST_TEST_EQ(v, static_cast<T>(0));
+
+        std::string rest;
+        in >> rest;
+        BOOST_TEST_CSTR_EQ(rest.c_str(), "8");
+    }
+}
+
+// showbase never adds a prefix to a zero, the same as the builtin types
+template <typename T>
+void test_ostream_showbase_zero()
+{
+    const T zero {0};
+
+    std::stringstream hex_out;
+    hex_out.flags(std::ios_base::hex | std::ios_base::showbase);
+    hex_out << zero;
+    BOOST_TEST_CSTR_EQ(hex_out.str().c_str(), "0");
+
+    std::stringstream oct_out;
+    oct_out.flags(std::ios_base::oct | std::ios_base::showbase);
+    oct_out << zero;
+    BOOST_TEST_CSTR_EQ(oct_out.str().c_str(), "0");
+
+    std::stringstream dec_out;
+    dec_out.flags(std::ios_base::dec | std::ios_base::showbase);
+    dec_out << zero;
+    BOOST_TEST_CSTR_EQ(dec_out.str().c_str(), "0");
+
+    // A nonzero value keeps its prefix
+    std::stringstream hex_one;
+    hex_one.flags(std::ios_base::hex | std::ios_base::showbase);
+    hex_one << T {1};
+    BOOST_TEST_CSTR_EQ(hex_one.str().c_str(), "0x1");
+}
+
 int main()
 {
     test_istream<boost::int128::uint128>();
     test_istream<boost::int128::int128>();
 
+    test_istream_failures<boost::int128::uint128>();
+    test_istream_failures<boost::int128::int128>();
+
+    test_istream_prefixes<boost::int128::uint128>();
+    test_istream_prefixes<boost::int128::int128>();
+
     test_ostream<boost::int128::uint128>();
     test_ostream<boost::int128::int128>();
+
+    test_ostream_showbase_zero<boost::int128::uint128>();
+    test_ostream_showbase_zero<boost::int128::int128>();
 
     // 32-bit windows does not set the iomanip flags correctly in CI
     #ifndef _M_IX86

@@ -4,14 +4,7 @@
 
 cmake_minimum_required(VERSION 3.10...3.20)
 
-# Set version explicitly if not part of Boost superproject
-if(NOT BOOST_SUPERPROJECT_VERSION)
-    set(BOOST_INT128_VERSION 3.1.0)
-else()
-    set(BOOST_INT128_VERSION ${BOOST_SUPERPROJECT_VERSION})
-endif()
-
-project(boost_int128 VERSION ${BOOST_INT128_VERSION} LANGUAGES CXX)
+project(boost_int128 VERSION 1.93.0 LANGUAGES CXX)
 
 add_library(boost_int128 INTERFACE)
 

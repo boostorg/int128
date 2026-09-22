@@ -192,8 +192,22 @@ void test_alignment_negative()
     BOOST_TEST_CSTR_EQ(fmt::format("{:*^7d}", T{-42}).c_str(), "**-42**");
 }
 
+// The alternate form adds no octal prefix to a zero, matching fmt::format for the builtins
+template <typename T>
+void test_zero_alternate()
+{
+    BOOST_TEST_CSTR_EQ(fmt::format("{:#o}", T{0}).c_str(), "0");
+    BOOST_TEST_CSTR_EQ(fmt::format("{:#x}", T{0}).c_str(), "0x0");
+    BOOST_TEST_CSTR_EQ(fmt::format("{:#X}", T{0}).c_str(), "0X0");
+    BOOST_TEST_CSTR_EQ(fmt::format("{:#b}", T{0}).c_str(), "0b0");
+    BOOST_TEST_CSTR_EQ(fmt::format("{:#o}", T{8}).c_str(), "010");
+}
+
 int main()
 {
+    test_zero_alternate<boost::int128::uint128>();
+    test_zero_alternate<boost::int128::int128>();
+
     test_empty<boost::int128::uint128>();
     test_empty<boost::int128::int128>();
     test_empty_negative<boost::int128::int128>();

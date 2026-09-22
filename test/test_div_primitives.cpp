@@ -249,10 +249,248 @@ static void test_udiv_2by1_edges()
 
 #endif // BOOST_INT128_HAS_INT128
 
+// impl::knuth_divide is generic in the word count (Boost.Decimal divides 256-bit values with it),
+// so exercise it directly on 8-word operands against an independent bit-serial reference divider,
+// and confirm the 4-word path still agrees with the uint128 operators.
+namespace knuth {
+
+constexpr std::size_t words {8};
+
+static bool less_than(const std::uint32_t (&a)[words], const std::uint32_t (&b)[words])
+{
+    for (std::size_t i {words}; i-- > 0;)
+    {
+        if (a[i] != b[i])
+        {
+            return a[i] < b[i];
+        }
+    }
+
+    return false;
+}
+
+static void subtract(std::uint32_t (&a)[words], const std::uint32_t (&b)[words])
+{
+    std::uint64_t borrow {};
+    for (std::size_t i {}; i < words; ++i)
+    {
+        // A negative difference wraps, which sets bit 32 and above
+        const std::uint64_t diff {static_cast<std::uint64_t>(a[i]) - b[i] - borrow};
+        a[i] = static_cast<std::uint32_t>(diff);
+        borrow = (diff >> 32U) & 1U;
+    }
+}
+
+// Restoring long division one bit at a time: slow, obviously correct, shares nothing with Algorithm D
+static void reference_divide(const std::uint32_t (&u)[words], const std::uint32_t (&v)[words],
+                             std::uint32_t (&q)[words], std::uint32_t (&r)[words])
+{
+    for (std::size_t i {}; i < words; ++i)
+    {
+        q[i] = 0;
+        r[i] = 0;
+    }
+
+    for (std::size_t bit {32U * words}; bit-- > 0;)
+    {
+        std::uint32_t carry {(u[bit / 32U] >> (bit % 32U)) & 1U};
+        for (std::size_t i {}; i < words; ++i)
+        {
+            const std::uint32_t next {r[i] >> 31U};
+            r[i] = (r[i] << 1U) | carry;
+            carry = next;
+        }
+
+        if (!less_than(r, v))
+        {
+            subtract(r, v);
+            q[bit / 32U] |= (UINT32_C(1) << (bit % 32U));
+        }
+    }
+}
+
+static std::size_t word_count(const std::uint32_t (&x)[words])
+{
+    std::size_t n {words};
+    while (n > 0 && x[n - 1] == 0U)
+    {
+        --n;
+    }
+
+    return n;
+}
+
+static void check(const std::uint32_t (&u)[words], const std::uint32_t (&v)[words])
+{
+    const auto m {word_count(u)};
+    const auto n {word_count(v)};
+
+    if (n < 2 || m < n)
+    {
+        return; // outside the preconditions of Algorithm D
+    }
+
+    std::uint32_t expected_q[words] {};
+    std::uint32_t expected_r[words] {};
+    reference_divide(u, v, expected_q, expected_r);
+
+    std::uint32_t scratch[words] {};
+    std::uint32_t q[words] {};
+    for (std::size_t i {}; i < words; ++i)
+    {
+        scratch[i] = u[i];
+    }
+
+    detail::impl::knuth_divide<true>(scratch, m, v, n, q);
+
+    for (std::size_t i {}; i < words; ++i)
+    {
+        BOOST_TEST_EQ(q[i], expected_q[i]);
+        BOOST_TEST_EQ(scratch[i], expected_r[i]);
+    }
+
+    std::uint32_t q_only[words] {};
+    for (std::size_t i {}; i < words; ++i)
+    {
+        scratch[i] = u[i];
+    }
+
+    detail::impl::knuth_divide<false>(scratch, m, v, n, q_only);
+
+    for (std::size_t i {}; i < words; ++i)
+    {
+        BOOST_TEST_EQ(q_only[i], expected_q[i]);
+    }
+}
+
+static void random_operand(std::uint32_t (&x)[words], const std::size_t count)
+{
+    for (std::size_t i {}; i < words; ++i)
+    {
+        x[i] = i < count ? static_cast<std::uint32_t>(dist(rng)) : 0U;
+    }
+
+    if (x[count - 1] == 0U)
+    {
+        x[count - 1] = 1U;
+    }
+}
+
+static void test_random()
+{
+    std::uniform_int_distribution<std::size_t> dividend_words(2, words);
+
+    for (int i {}; i < 100000; ++i)
+    {
+        const auto m {dividend_words(rng)};
+        const auto n {std::uniform_int_distribution<std::size_t>(2, m)(rng)};
+
+        std::uint32_t u[words] {};
+        std::uint32_t v[words] {};
+        random_operand(u, m);
+        random_operand(v, n);
+
+        check(u, v);
+    }
+}
+
+static void test_edges()
+{
+    const std::uint32_t patterns[] {
+        UINT32_C(0), UINT32_C(1), UINT32_C(2), UINT32_C(0x7FFFFFFF),
+        UINT32_C(0x80000000), UINT32_C(0xFFFFFFFF), UINT32_C(0x00010000), UINT32_C(0x12345678)
+    };
+    const std::size_t counts[] {2, 3, 4, 5, 7, 8};
+
+    for (const auto m : counts)
+    {
+        for (const auto n : counts)
+        {
+            if (n > m)
+            {
+                continue;
+            }
+
+            for (const auto pu : patterns)
+            {
+                for (const auto pv : patterns)
+                {
+                    for (const auto top : patterns)
+                    {
+                        std::uint32_t u[words] {};
+                        std::uint32_t v[words] {};
+
+                        for (std::size_t i {}; i < m; ++i)
+                        {
+                            u[i] = pu;
+                        }
+                        for (std::size_t i {}; i < n; ++i)
+                        {
+                            v[i] = pv;
+                        }
+
+                        u[m - 1] = top == 0U ? 1U : top;
+                        v[n - 1] = top == 0U ? 1U : top;
+
+                        check(u, v);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The 4-word instantiation is the one the library itself has always used: it must agree with
+// the uint128 operators, which take a different path entirely.
+static void test_matches_uint128()
+{
+    for (int i {}; i < 500000; ++i)
+    {
+        uint128 u_val {dist(rng), dist(rng)};
+        uint128 v_val {dist(rng), dist(rng)};
+
+        // Algorithm D needs at least two 32-bit divisor words
+        if (v_val.high == 0U && v_val.low <= UINT32_MAX)
+        {
+            v_val.low |= UINT64_C(1) << 32U;
+        }
+
+        if (i % 4 == 0)
+        {
+            v_val.high = 0U; // exercise the 2 and 3 word divisors as well
+        }
+
+        if (u_val < v_val)
+        {
+            const auto tmp {u_val};
+            u_val = v_val;
+            v_val = tmp;
+        }
+
+        std::uint32_t u[4] {};
+        std::uint32_t v[4] {};
+        std::uint32_t q[4] {};
+
+        const auto m {detail::impl::to_words(u_val, u)};
+        const auto n {detail::impl::to_words(v_val, v)};
+
+        detail::impl::knuth_divide<true>(u, m, v, n, q);
+
+        BOOST_TEST_EQ(detail::impl::from_words<uint128>(q), u_val / v_val);
+        BOOST_TEST_EQ(detail::impl::from_words<uint128>(u), u_val % v_val);
+    }
+}
+
+} // namespace knuth
+
 int main()
 {
     test_div3by2_random();
     test_div3by2_edges();
+
+    knuth::test_random();
+    knuth::test_edges();
+    knuth::test_matches_uint128();
 
     #if defined(BOOST_INT128_HAS_INT128)
 

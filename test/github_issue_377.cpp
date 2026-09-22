@@ -2,7 +2,7 @@
 // Distributed under the Boost Software License, Version 1.0.
 // https://www.boost.org/LICENSE_1_0.txt
 //
-// See: https://github.com/cppalliance/int128/issues/377
+// See: https://github.com/boostorg/int128/issues/377
 
 #include <boost/int128.hpp>
 #include <boost/core/lightweight_test.hpp>

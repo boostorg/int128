@@ -89,6 +89,12 @@ BOOST_INT128_HOST_DEVICE constexpr int from_chars_integer_impl(const char* first
         return EINVAL;
     }
 
+    // A base outside 2..36 has no digit set; base 0 would divide by zero below
+    if (base < 2 || base > 36)
+    {
+        return EINVAL;
+    }
+
     Unsigned_Integer result {};
     Unsigned_Integer overflow_value {};
     Unsigned_Integer max_digit {};
@@ -220,6 +226,13 @@ BOOST_INT128_HOST_DEVICE constexpr int from_chars_integer_impl(const char* first
         return EDOM;
     }
 
+    // Nothing consumed means the first character was not a digit in this base. The
+    // output is left untouched, as std::from_chars specifies, and 0 is returned.
+    if (next == first || (is_negative && next == first + 1))
+    {
+        return 0;
+    }
+
     value = static_cast<Integer>(result);
 
     BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Integer>::is_signed)
@@ -300,10 +313,12 @@ BOOST_int128EST_EXPORT BOOST_INT128_HOST_DEVICE constexpr int from_chars_literal
 // Parse a user-defined literal, hard-failing on any malformed or out-of-range input.
 // A C++ base prefix (0x/0X hex, 0b/0B binary, or a leading 0 for octal) is stripped and
 // the digits parsed in that base, otherwise handled as base 10
+// A malformed or out-of-range literal is a compile-time error in a constant expression and
+// terminates the program at run time (the reporters throw out of this noexcept function).
 template <typename Integer>
 BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, const char* last) noexcept
 {
-    Integer value {};
+    Integer parse_value {};
 
     // A leading sign stays with the digits; a base prefix, if present, follows it.
     auto next = first;
@@ -343,7 +358,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
     // Overflow is reported as EDOM; anything else short of full consumption is malformed.
     if (!prefixed)
     {
-        const auto status = from_chars_literal(first, last, value);
+        const auto status = from_chars_literal(first, last, parse_value);
         if (status == EDOM)
         {
             BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
@@ -353,11 +368,11 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
             BOOST_INT128_REJECT_LITERAL(parse_invalid_literal);
         }
 
-        return value;
+        return parse_value;
     }
 
     // Prefixed: parse the magnitude in the detected base, then reapply the sign.
-    const auto status = from_chars_literal(next, last, value, base);
+    const auto status = from_chars_literal(next, last, parse_value, base);
     if (status == EDOM)
     {
         BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
@@ -371,7 +386,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
     {
         BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Integer>::is_signed)
         {
-            value = static_cast<Integer>(-value);
+            parse_value = static_cast<Integer>(-parse_value);
         }
         else
         {
@@ -379,7 +394,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
         }
     }
 
-    return value;
+    return parse_value;
 }
 
 } // namespace detail

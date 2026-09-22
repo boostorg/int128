@@ -1128,6 +1128,61 @@ void test_abs()
     }
 }
 
+// Exercises the branch-free abs edge cases: the low-word borrow, and the two values
+// whose magnitude is not representable
+void test_spot_abs()
+{
+    using boost::int128::abs;
+    using boost::int128::int128;
+
+    constexpr auto min_val {std::numeric_limits<int128>::min()};
+    constexpr auto max_val {std::numeric_limits<int128>::max()};
+
+    static_assert(abs(int128{0}) == 0, "abs(0)");
+    static_assert(abs(int128{1}) == 1, "abs(1)");
+    static_assert(abs(int128{-1}) == 1, "abs(-1)");
+    static_assert(abs(max_val) == max_val, "abs(max)");
+
+    // abs(min()) is not representable, so it wraps back to min() just like the builtins
+    static_assert(abs(min_val) == min_val, "abs(min)");
+    static_assert(abs(min_val + 1) == max_val, "abs(min + 1)");
+
+    BOOST_TEST(abs(int128{0}) == 0);
+    BOOST_TEST(abs(int128{1}) == 1);
+    BOOST_TEST(abs(int128{-1}) == 1);
+    BOOST_TEST(abs(max_val) == max_val);
+    BOOST_TEST(abs(min_val) == min_val);
+    BOOST_TEST(abs(min_val + 1) == max_val);
+
+    // Low word of zero takes the borrow path in the negation
+    const auto neg_two_64 {boost::int128::detail::from_bits(UINT64_MAX, UINT64_C(0))};
+    BOOST_TEST(abs(neg_two_64) == boost::int128::detail::from_bits(UINT64_C(1), UINT64_C(0)));
+    BOOST_TEST(abs(neg_two_64) == -neg_two_64);
+
+    const auto neg_high_only {boost::int128::detail::from_bits(UINT64_C(0xFFFFFFFF00000000), UINT64_C(0))};
+    BOOST_TEST(abs(neg_high_only) == -neg_high_only);
+
+    // Only the low word is set, so no borrow occurs
+    const auto neg_low_only {boost::int128::detail::from_bits(UINT64_MAX, UINT64_MAX)};
+    BOOST_TEST(abs(neg_low_only) == 1);
+
+    #ifndef BOOST_INT128_HAS_MSVC_INT128
+
+    // Parity with the builtin type over the full width
+    boost::random::uniform_int_distribution<builtin_i128> dist(get_min<builtin_i128>(),
+                                                               get_max<builtin_i128>());
+
+    for (std::size_t i {}; i < N; ++i)
+    {
+        const auto value {dist(rng)};
+        const auto builtin_res {value < 0 ? -value : value};
+
+        BOOST_TEST(abs(int128{value}) == builtin_res);
+    }
+
+    #endif // BOOST_INT128_HAS_MSVC_INT128
+}
+
 template <typename IntType>
 void test_spot_mod(const IntType value, const IntType value2)
 {
@@ -1180,7 +1235,7 @@ struct test_caller
         test_operator_add<T>();
         test_operator_sub<T>();
         test_operator_mul<T>();
-        // See: https://github.com/cppalliance/int128/issues/147#issuecomment-2936929238
+        // See: https://github.com/boostorg/int128/issues/147#issuecomment-2936929238
         #if !defined(_M_IX86) || (defined(_M_IX86) && defined(_DEBUG))
         test_operator_div<T>();
         test_operator_mod<T>();
@@ -1214,6 +1269,8 @@ int main()
 
     boost::mp11::mp_for_each<test_types>(test_caller());
 
+    test_spot_abs();
+
     // MSVC std::_Signed128 does not provide a float conversion operator
     #ifndef BOOST_INT128_HAS_MSVC_INT128
 
@@ -1223,7 +1280,7 @@ int main()
 
     #endif // BOOST_INT128_HAS_MSVC_INT128
 
-    // See: https://github.com/cppalliance/int128/issues/147#issuecomment-2936929238
+    // See: https://github.com/boostorg/int128/issues/147#issuecomment-2936929238
     #if !defined(_M_IX86) || (defined(_M_IX86) && defined(_DEBUG))
     // lhs % rhs == -880554185798178108
     // rhs % lhs == -1184271995001643447

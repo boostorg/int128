@@ -278,9 +278,12 @@ struct formatter
         const auto end = detail::mini_to_chars(buffer, abs_v, base, is_upper);
         std::string s(end, buffer + sizeof(buffer));
 
+        // The alternate form never adds an octal prefix to a zero: std::format("{:#o}", 0) is "0"
+        const bool add_prefix {prefix && !(base == 8 && abs_v == 0U)};
+
         // Calculate prefix length that will be added later
         std::size_t prefix_len {0};
-        if (prefix)
+        if (add_prefix)
         {
             switch (base)
             {
@@ -323,7 +326,7 @@ struct formatter
             }
         }
 
-        if (prefix)
+        if (add_prefix)
         {
             switch (base)
             {

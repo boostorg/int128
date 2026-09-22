@@ -10,6 +10,17 @@ https://www.boost.org/LICENSE_1_0.txt
 
 == Unreleased
 
+=== Fixed
+
+* `operator>>` now sets `failbit` (and zeroes the target) when no digit could be extracted or the value does not fit, so `while (is >> value)` terminates on invalid input as it does for the builtin types.
+Previously the stream reported success and put every character back, which looped forever.
+* `operator>>` with `std::hex` treated a bare leading zero as a base prefix and did not count a consumed `0x` prefix, so `0` left its digit in the stream, `0f` read as 0 instead of 15, and `0x1fz` left `1fz` behind.
+Octal input no longer strips a leading zero either, since it is already a digit in base 8.
+* `operator<<` with `std::showbase`, and `std::format` or `fmt::format` with the `#o` alternate form, no longer prefix a zero (`0x0` and `00` are now `0`), matching the standard facilities.
+* `gcd` returned 1 for equal operands wider than 64 bits (for example `gcd(2^64 + 1, 2^64 + 1)`) because the loop dropped to the 64-bit helper while the high word of the result was still nonzero.
+* `detail::from_chars` left the output at zero when no digit could be parsed and divided by zero for base 0.
+It now leaves the output untouched on any failure and returns `EINVAL` for a base outside 2 to 36.
+
 === New: byte order conversions
 
 The new header `<boost/int128/byte_conversions.hpp>` converts `uint128` and `int128` to and from big-endian or little-endian byte order, which is what writing a 128-bit value into a packet, a file format, or a database column requires.

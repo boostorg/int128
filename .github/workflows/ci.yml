@@ -1159,7 +1159,7 @@ jobs:
     strategy:
       fail-fast: false
 
-    runs-on: gpu-runner-1
+    runs-on: ubuntu-latest
 
     steps:
       - uses: Jimver/cuda-toolkit@v0.2.30
@@ -1208,9 +1208,10 @@ jobs:
             mkdir __build__ && cd __build__
             cmake -DBOOST_INCLUDE_LIBRARIES=$LIBRARY -DBUILD_TESTING=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc -DBOOST_INT128_ENABLE_CUDA=1 -DCMAKE_CUDA_ARCHITECTURES="75;86" -DCMAKE_CUDA_STANDARD=${std} ..
             cmake --build . --target tests -j $(nproc)
-            ctest --output-on-failure --no-tests=error
+          
             cd $GITHUB_WORKSPACE
           done
+        # ctest --output-on-failure --no-tests=error is removed above in the boostorg repo
 
   sycl-cmake-test:
     strategy:

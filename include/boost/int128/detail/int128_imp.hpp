@@ -342,21 +342,6 @@ BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr int128 from_bits(co
 } // namespace detail
 
 //=====================================
-// Absolute Value function
-//=====================================
-
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 abs(int128 value) noexcept
-{
-    if (value.signed_high() < 0)
-    {
-        value.low = ~value.low + 1U;
-        value.high = ~value.high + static_cast<std::uint64_t>(value.low == 0 ? 1 : 0);
-    }
-    
-    return value;
-}
-
-//=====================================
 // Float Conversion Operators
 //=====================================
 
@@ -1999,6 +1984,21 @@ BOOST_INT128_HOST_DEVICE inline int128& int128::operator-=(const Integer rhs) no
 }
 
 #endif // BOOST_INT128_HAS_MSVC_INT128
+
+//=====================================
+// Absolute Value function
+//=====================================
+
+// Branch-free two's complement absolute value: (x ^ mask) - mask, where mask is all
+// ones for a negative value and zero otherwise. abs(min()) is min(), which matches the
+// behavior of the builtin signed integer types.
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 abs(const int128 value) noexcept
+{
+    const auto sign_word {static_cast<std::uint64_t>(value.signed_high() >> 63)};
+    const auto mask {detail::from_bits(sign_word, sign_word)};
+
+    return (value ^ mask) - mask;
+}
 
 //=====================================
 // Multiplication Operators

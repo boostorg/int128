@@ -14,6 +14,11 @@
 #  pragma GCC diagnostic ignored "-Wdouble-promotion"
 #endif
 
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable: 4848)
+#endif
+
 #include <boost/container_hash/hash.hpp>
 #include <boost/unordered/unordered_map.hpp>
 #include <boost/unordered/unordered_set.hpp>

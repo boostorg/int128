@@ -1,0 +1,82 @@
+# Copyright 2026 Matt Borland
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or copy at http://boost.org/LICENSE_1_0.txt)
+#
+# Builds the full test suite for WebAssembly (wasm32) with Emscripten and runs it
+# under node. wasm32 is a 32-bit platform (ILP32), so this exercises the library
+# without native 64-bit registers and with the compiler-rt software fallbacks for
+# 64-bit and 128-bit division (e.g. __udivdi3 and friends). See issue discussion
+# about 32-bit targets that lack a native 64-bit division instruction.
+
+name: wasm
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - develop
+      - feature/**
+
+concurrency:
+  group: ${{format('wasm-{0}:{1}', github.repository, github.ref)}}
+  cancel-in-progress: true
+
+jobs:
+  emscripten-cmake-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cxxstd: '14'
+          - cxxstd: '17'
+          - cxxstd: '20'
+
+    runs-on: ubuntu-24.04
+    container: emscripten/emsdk:latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Boost
+        run: |
+          echo GITHUB_REPOSITORY: $GITHUB_REPOSITORY
+          LIBRARY=${GITHUB_REPOSITORY#*/}
+          echo LIBRARY: $LIBRARY
+          echo "LIBRARY=$LIBRARY" >> $GITHUB_ENV
+          echo GITHUB_BASE_REF: $GITHUB_BASE_REF
+          echo GITHUB_REF: $GITHUB_REF
+          REF=${GITHUB_BASE_REF:-$GITHUB_REF}
+          REF=${REF#refs/heads/}
+          echo REF: $REF
+          BOOST_BRANCH=develop && [ "$REF" == "master" ] && BOOST_BRANCH=master || true
+          echo BOOST_BRANCH: $BOOST_BRANCH
+          cd ..
+          git clone -b $BOOST_BRANCH --depth 1 https://github.com/boostorg/boost.git boost-root
+          cd boost-root
+          mkdir -p libs/$LIBRARY
+          cp -r $GITHUB_WORKSPACE/* libs/$LIBRARY
+          git submodule update --init tools/boostdep
+          python3 tools/boostdep/depinst/depinst.py --git_args "--jobs 3" $LIBRARY
+
+      - name: Configure
+        run: |
+          cd ../boost-root
+          mkdir __build__ && cd __build__
+          # Boost.Config does not define BOOST_HAS_PTHREADS for Emscripten, which sends
+          # Boost.Container's thread_mutex down its Windows path and fails to compile.
+          # Emscripten always provides the pthread API (single-threaded no-op stubs
+          # without -pthread), so defining it here is correct for this target.
+          # The wasm stack defaults to 64 KB; raise it to the typical desktop 8 MB so
+          # examples with large stack arrays behave as they do on other platforms.
+          emcmake cmake -DBOOST_INCLUDE_LIBRARIES=$LIBRARY -DBUILD_TESTING=ON -DCMAKE_CXX_STANDARD=${{matrix.cxxstd}} -DCMAKE_CXX_FLAGS="-DBOOST_HAS_PTHREADS" -DCMAKE_EXE_LINKER_FLAGS="-sSTACK_SIZE=8388608" ..
+
+      - name: Build tests
+        run: |
+          cd ../boost-root/__build__
+          cmake --build . --target tests -j $(nproc)
+
+      - name: Run tests
+        run: |
+          cd ../boost-root/__build__
+          ctest --output-on-failure --no-tests=error -j $(nproc)

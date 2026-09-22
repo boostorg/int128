@@ -171,13 +171,45 @@ void test_negative_value()
 #pragma warning(pop)
 #endif
 
+// The gcd can itself be wider than 64 bits. The old loop dropped to the 64-bit helper as
+// soon as b reached zero and lost the high word of a, so gcd(2^64 + 1, 2^64 + 1) was 1
+template <typename T>
+void test_gcd_wide()
+{
+    const T two_64_plus_1 {1, 1};
+    BOOST_TEST_EQ(gcd(two_64_plus_1, two_64_plus_1), two_64_plus_1);
+
+    const T three_2_64 {3, 0};
+    const T six_2_64 {6, 0};
+    BOOST_TEST_EQ(gcd(three_2_64, six_2_64), three_2_64);
+
+    // A wide odd common factor behind two coprime small factors
+    const T a {two_64_plus_1 * T(3)};
+    const T b {two_64_plus_1 * T(5)};
+    BOOST_TEST_EQ(gcd(a, b), two_64_plus_1);
+    BOOST_TEST_EQ(gcd(b, a), two_64_plus_1);
+    BOOST_TEST_EQ(lcm(a, b), two_64_plus_1 * T(15));
+
+    // Identical wide operands, and a wide operand dividing a multiple of itself
+    const T wide {UINT64_C(0x0123456789ABCDEF), UINT64_C(0xFEDCBA9876543211)};
+    BOOST_TEST_EQ(gcd(wide, wide), wide);
+    BOOST_TEST_EQ(gcd(wide, wide * T(7)), wide);
+    BOOST_TEST_EQ(gcd(wide * T(7), wide), wide);
+
+    // A wide result with a power of two factor
+    const T even_wide {wide * T(8)};
+    BOOST_TEST_EQ(gcd(even_wide, wide * T(12)), wide * T(4));
+}
+
 int main()
 {
     test_gcd<uint128>();
+    test_gcd_wide<uint128>();
     test_lcm<uint128>();
     test_gcd_lcm_properties<uint128>();
 
     test_gcd<int128>();
+    test_gcd_wide<int128>();
     test_lcm<int128>();
     test_gcd_lcm_properties<int128>();
     test_negative_value();

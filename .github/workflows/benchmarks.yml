@@ -244,16 +244,19 @@ jobs:
           - title: Linux s390x (emulated)
             arch: s390x
             platform: linux/s390x
+            image: s390x/debian:bookworm
             packages: g++ libabsl-dev
             ldflags: '-labsl_int128 -labsl_base'
           - title: Linux ppc64le (emulated)
             arch: ppc64le
             platform: linux/ppc64le
+            image: debian:bookworm
             packages: g++
             ldflags: ''
           - title: Linux ARM32 (emulated)
             arch: arm32
             platform: linux/arm/v7
+            image: debian:bookworm
             packages: g++
             ldflags: ''
     steps:
@@ -270,7 +273,7 @@ jobs:
             -v "$GITHUB_WORKSPACE/.github/scripts":/scripts:ro \
             -v "$GITHUB_WORKSPACE/bench-results":/out \
             -e DEBIAN_FRONTEND=noninteractive \
-            -w /boost-root debian:bookworm bash -c "
+            -w /boost-root ${{ matrix.image }} bash -c "
               apt-get -o Acquire::Retries=5 update
               apt-get -o Acquire::Retries=5 install -y ${{ matrix.packages }}
               /scripts/run_benchmarks.sh --compiler g++ --ldflags '${{ matrix.ldflags }}' \
