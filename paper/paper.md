@@ -50,7 +50,7 @@ Relaxed C++14 `constexpr` covers nearly the whole interface.
 
 Each type is a struct of two `std::uint64_t` words ordered by target endianness, so the object representation and alignment match a native 128-bit integer.
 Keeping both words unsigned lets the compiler treat the pair as one wide access, so loops over these types vectorize rather than scalarize.
-Operators forward to a native 128-bit type or intrinsic where one exists, and follow Knuth [@Knuth:1998] and Warren [@Warren:2013] over the two words elsewhere, with identical results.
+Operators forward to a native 128-bit type or intrinsic where one exists, and follow @Knuth:1998 and @Warren:2013 over the two words elsewhere, with identical results.
 The library also supplies the interfaces the extension lacks, among them `<limits>`, `<bit>`, `<charconv>`, `<format>`, `<iostream>`, hashing, Boost.Random and Boost.Math integration, saturating arithmetic, the C23 checked-arithmetic interface [@c23], and the `div_*` family of P3724 [@p3724].
 
 Continuous integration runs the test suite natively on Linux, macOS, and Windows across x86_64, x86_32, aarch64, ARM32v7, ARM64, and big-endian s390x, plus PPC64LE under QEMU, using GCC 5 and later, Clang 5 and later, Visual Studio 2017 and later, Intel oneAPI DPC++, and NVCC.
@@ -118,6 +118,6 @@ All library code, benchmark results, and text were reviewed and verified by the 
 
 # Acknowledgements
 
-We thank The C++ Alliance for sponsoring this work, the domain experts who peer-reviewed the library in July 2026 before its acceptance into the Boost library collection, and Arnaud Becheler for managing that review.
+We thank the C++ Alliance for sponsoring this work, the domain experts who peer-reviewed the library in July 2026 before its acceptance into the Boost library collection, and Arnaud Becheler for managing that review.
 
 # References
