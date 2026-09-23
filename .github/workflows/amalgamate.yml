@@ -31,7 +31,7 @@ jobs:
   regenerate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Regenerate the single header
         run: python3 extra/amalgamate.py
