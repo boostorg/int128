@@ -263,7 +263,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Setup Boost
         run: .github/scripts/setup_benchmarks.sh
-      - uses: docker/setup-qemu-action@v6
+      - uses: docker/setup-qemu-action@v4
       - name: Build and run
         run: |
           # Create the output directory first so that docker does not, as root.
