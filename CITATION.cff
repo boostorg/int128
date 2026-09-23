@@ -1,0 +1,29 @@
+cff-version: "1.2.0"
+authors:
+- family-names: Borland
+  given-names: Matt
+  orcid: "https://orcid.org/0009-0005-8183-4254"
+doi: 10.5281/zenodo.22901349
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Borland
+    given-names: Matt
+    orcid: "https://orcid.org/0009-0005-8183-4254"
+  date-published: 2026-09-23
+  doi: 10.21105/joss.11293
+  issn: 2475-9066
+  issue: 125
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 11293
+  title: "Boost.Int128: A C++14 Library for Portable and Performant
+    128-Bit Integer Arithmetic"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.11293"
+  volume: 11
+title: "Boost.Int128: A C++14 Library for Portable and Performant
+  128-Bit Integer Arithmetic"
+  
