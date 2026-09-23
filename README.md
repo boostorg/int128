@@ -1,4 +1,4 @@
-# Boost.int128
+# Boost.int128 [![DOI](https://joss.theoj.org/papers/10.21105/joss.11293/status.svg)](https://doi.org/10.21105/joss.11293)
 Portable implementations of signed and unsigned 128-bit integers
 
 |                  | Master                                                                                                                                                            |   Develop   |
