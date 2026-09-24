@@ -153,6 +153,15 @@ int128
     constexpr operator long double() const noexcept;
     #endif
 
+    // C++23 <stdfloat> extended types
+    #if !defined(BOOST_INT128_HAS_GPU_SUPPORT) && defined(BOOST_INT128_HAS_STDFLOAT)
+    template <typename ExtFloat, std::enable_if_t<detail::is_extended_floating_point_v<ExtFloat>, bool> = true>
+    BOOST_INT128_HOST_DEVICE constexpr operator ExtFloat() const noexcept
+    {
+        return detail::signed_words_to_float<ExtFloat>(signed_high(), low);
+    }
+    #endif
+
     // Compound Or
     template <BOOST_INT128_DEFAULTED_INTEGER_CONCEPT>
     BOOST_INT128_HOST_DEVICE constexpr int128& operator|=(Integer rhs) noexcept;

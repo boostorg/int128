@@ -83,6 +83,7 @@ run test_builtin_parity.cpp ;
 run test_float_mixed_ops.cpp ;
 run test_integer_mixed_ops.cpp ;
 run test_float_conversion.cpp ;
+run test_stdfloat.cpp ;
 
 run test_consteval_funcs.cpp ;
 run test_sign_compare.cpp ;
