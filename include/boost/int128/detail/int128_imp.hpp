@@ -153,6 +153,15 @@ int128
     constexpr operator long double() const noexcept;
     #endif
 
+    // C++23 <stdfloat> extended types
+    #if !defined(BOOST_INT128_HAS_GPU_SUPPORT) && defined(BOOST_INT128_HAS_STDFLOAT)
+    template <typename ExtFloat, std::enable_if_t<detail::is_extended_floating_point_v<ExtFloat>, bool> = true>
+    BOOST_INT128_HOST_DEVICE constexpr operator ExtFloat() const noexcept
+    {
+        return detail::signed_words_to_float<ExtFloat>(signed_high(), low);
+    }
+    #endif
+
     // Compound Or
     template <BOOST_INT128_DEFAULTED_INTEGER_CONCEPT>
     BOOST_INT128_HOST_DEVICE constexpr int128& operator|=(Integer rhs) noexcept;
@@ -404,6 +413,13 @@ constexpr int128::operator long double() const noexcept
 template <BOOST_INT128_FLOATING_POINT_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr int128::int128(Float f) noexcept
 {
+    // A type this narrow cannot hold the ladder's scale constants below
+    BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Float>::max_exponent < 128)
+    {
+        *this = int128(static_cast<float>(f));
+        return;
+    }
+
     constexpr Float two_32 {static_cast<Float>(UINT64_C(1) << 32)};
     constexpr Float two_64 {two_32 * two_32};
     constexpr Float two_127 {two_64 * static_cast<Float>(UINT64_C(1) << 63)};

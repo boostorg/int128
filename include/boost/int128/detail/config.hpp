@@ -348,4 +348,14 @@ BOOST_int128EST_EXPORT using builtin_u128 = std::_Unsigned128;
 // "SYCL_EXTERNAL" (SYCL), or nothing (host).
 #define BOOST_INT128_HOST_DEVICE BOOST_INT128_CUDA_ENABLED BOOST_INT128_SYCL_ENABLED
 
+// C++23 <stdfloat> extended floating-point types each have their own macro that needs to be checked
+#if (__cplusplus > 202002L || (defined(_MSVC_LANG) && _MSVC_LANG > 202002L)) && !defined(BOOST_INT128_HAS_GPU_SUPPORT) && defined(__has_include)
+#  if __has_include(<stdfloat>)
+#    ifndef BOOST_INT128_BUILD_MODULE
+#      include <stdfloat>
+#    endif
+#    define BOOST_INT128_HAS_STDFLOAT
+#  endif
+#endif
+
 #endif // BOOST_INT128_DETAIL_CONFIG_HPP
