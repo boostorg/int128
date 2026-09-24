@@ -1202,6 +1202,31 @@ void test_spot_mod(const IntType value, const IntType value2)
     BOOST_TEST((value2 % emulated_value) == (value2 % builtin_value));
 }
 
+template <typename IntType, std::enable_if_t<boost::int128::detail::is_signed_integer_v<IntType>, bool> = true>
+void test_min_divisor()
+{
+    const auto min_val {std::numeric_limits<boost::int128::int128>::min()};
+
+    const IntType positive_value {static_cast<IntType>(5)};
+    const IntType negative_value {static_cast<IntType>(-5)};
+
+    BOOST_TEST(positive_value % min_val == positive_value);
+    BOOST_TEST(positive_value / min_val == 0);
+    BOOST_TEST(negative_value % min_val == negative_value);
+    BOOST_TEST(negative_value / min_val == 0);
+}
+
+template <typename IntType, std::enable_if_t<boost::int128::detail::is_unsigned_integer_v<IntType>, bool> = true>
+void test_min_divisor()
+{
+    const auto min_val {std::numeric_limits<boost::int128::int128>::min()};
+
+    const IntType value {static_cast<IntType>(5)};
+
+    BOOST_TEST(value % min_val == value);
+    BOOST_TEST(value / min_val == 0);
+}
+
 struct test_caller
 {
     template<typename T>
@@ -1239,6 +1264,7 @@ struct test_caller
         #if !defined(_M_IX86) || (defined(_M_IX86) && defined(_DEBUG))
         test_operator_div<T>();
         test_operator_mod<T>();
+        test_min_divisor<T>();
         #endif
 
         test_abs<T>();
