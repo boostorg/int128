@@ -54,7 +54,23 @@ struct floating_point
 {
     static constexpr bool value = std::is_same<T, float>::value || std::is_same<T, double>::value
     #ifndef BOOST_INT128_HAS_GPU_SUPPORT
-    || std::is_same<T, long double>::value;
+    || std::is_same<T, long double>::value
+    #if defined(BOOST_INT128_HAS_STDFLOAT) && defined(__STDCPP_FLOAT16_T__)
+    || std::is_same<T, std::float16_t>::value
+    #endif
+    #if defined(BOOST_INT128_HAS_STDFLOAT) && defined(__STDCPP_FLOAT32_T__)
+    || std::is_same<T, std::float32_t>::value
+    #endif
+    #if defined(BOOST_INT128_HAS_STDFLOAT) && defined(__STDCPP_FLOAT64_T__)
+    || std::is_same<T, std::float64_t>::value
+    #endif
+    #if defined(BOOST_INT128_HAS_STDFLOAT) && defined(__STDCPP_FLOAT128_T__)
+    || std::is_same<T, std::float128_t>::value
+    #endif
+    #if defined(BOOST_INT128_HAS_STDFLOAT) && defined(__STDCPP_BFLOAT16_T__)
+    || std::is_same<T, std::bfloat16_t>::value
+    #endif
+    ;
     #else
     ;
     #endif
@@ -62,6 +78,11 @@ struct floating_point
 
 template <typename T>
 BOOST_INT128_INLINE_CONSTEXPR bool is_floating_point_v = floating_point<T>::value;
+
+// True only for a C++23 <stdfloat> types
+template <typename T>
+BOOST_INT128_INLINE_CONSTEXPR bool is_extended_floating_point_v = floating_point<T>::value
+    && !std::is_same<T, float>::value && !std::is_same<T, double>::value && !std::is_same<T, long double>::value;
 
 // The type integral promotion gives an operand of type T, which is the result type of a
 // shift with T on the left. The rule depends on the rank of T and not only on its size, so
