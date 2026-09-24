@@ -20,6 +20,11 @@ Octal input no longer strips a leading zero either, since it is already a digit 
 * `gcd` returned 1 for equal operands wider than 64 bits (for example `gcd(2^64 + 1, 2^64 + 1)`) because the loop dropped to the 64-bit helper while the high word of the result was still nonzero.
 * `detail::from_chars` left the output at zero when no digit could be parsed and divided by zero for base 0.
 It now leaves the output untouched on any failure and returns `EINVAL` for a base outside 2 to 36.
+* `pass:[unsigned-integer % int128::min()]` divided by zero. `abs(int128::min())` wraps back to `int128::min()` itself, since its magnitude (`2^127`) is not representable, so the signed comparison used to detect "divisor magnitude exceeds the built-in lhs" saw it as very negative instead of very large, and fell through to a modulo by the (zero) low word of that wrapped value. `pass:[unsigned-integer / int128::min()]` and the corresponding signed-lhs overloads were already correct.
+* `int128 /= uint128` (and the other 9 compound assignment operators) had no dedicated cross-type overload, so the `uint128` right operand converted to `int128` first, a bit copy that changes how the value is interpreted whenever its top bit is set.
+This disagreed with the built-in model, in which `pass:[__int128]` compound-assigned from `pass:[unsigned __int128]` always computes in the unsigned domain and converts only the final result back.
+All 10 compound assignment operators (`pass:[|=]`, `pass:[&=]`, `pass:[^=]`, `pass:[+=]`, `pass:[-=]`, `pass:[*=]`, `pass:[/=]`, `pass:[%=]`, `pass:[<<=]`, `pass:[>>=]`) between `int128` and a `uint128` right operand are now provided; see xref:mixed_type_ops.adoc#mixed_ops_int128_uint128_compound[Compound Assignment Between int128 and uint128].
+* `operator<<` with `std::showbase` printed a negative `int128` in hexadecimal or octal as `0x-ff` instead of `-0xff`: the base prefix was written in front of the whole buffer, including the sign, rather than between the sign and the digits.
 
 === New: byte order conversions
 
