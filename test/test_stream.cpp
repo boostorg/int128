@@ -143,6 +143,39 @@ void test_ostream()
         std::stringstream reg_out;
         reg_out << regular_val;
         BOOST_TEST_CSTR_EQ(reg_out.str().c_str(), "-4500");
+
+        // Defect C regression: showbase must place the sign before the base prefix
+        // ("-0xff", not "0x-ff"), matching where a hand-written sign + prefix would go.
+
+        // 32-bit windows does not set the flags correctly in CI
+        #ifndef _M_IX86
+
+        boost::int128::int128 neg_hex_val {-255};
+        std::stringstream neg_hex_out;
+        neg_hex_out.flags(std::ios_base::hex | std::ios_base::showbase);
+        neg_hex_out << neg_hex_val;
+        BOOST_TEST_CSTR_EQ(neg_hex_out.str().c_str(), "-0xff");
+
+        std::stringstream neg_hex_out_upper;
+        neg_hex_out_upper.flags(std::ios_base::hex | std::ios_base::uppercase | std::ios_base::showbase);
+        neg_hex_out_upper << neg_hex_val;
+        BOOST_TEST_CSTR_EQ(neg_hex_out_upper.str().c_str(), "-0XFF");
+
+        boost::int128::int128 neg_oct_val {-255};
+        std::stringstream neg_oct_out;
+        neg_oct_out.flags(std::ios_base::oct | std::ios_base::showbase);
+        neg_oct_out << neg_oct_val;
+        BOOST_TEST_CSTR_EQ(neg_oct_out.str().c_str(), "-0377");
+
+        // A negative value that stringifies to zero magnitude never happens for
+        // int128 (there is no negative zero), but showbase on a positive-domain
+        // decimal negative value must still show no prefix at all in base 10
+        std::stringstream neg_dec_out;
+        neg_dec_out.flags(std::ios_base::dec | std::ios_base::showbase);
+        neg_dec_out << neg_hex_val;
+        BOOST_TEST_CSTR_EQ(neg_dec_out.str().c_str(), "-255");
+
+        #endif
     }
 }
 

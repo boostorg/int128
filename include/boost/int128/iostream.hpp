@@ -158,6 +158,16 @@ auto operator<<(std::basic_ostream<charT, traits>& os, const LibIntegerType& v)
     // A zero prints as a bare "0" with showbase, the same as the builtin types
     if ((flags & std::ios_base::showbase) && v != 0U)
     {
+        // mini_to_chars writes the sign, if any, before the digits. Step past it
+        // before prepending the base prefix, so the prefix lands between the sign
+        // and the digits, then restore the sign in front of the prefix: "-0xff",
+        // not "0x-ff".
+        const bool negative {*first == '-'};
+        if (negative)
+        {
+            ++first;
+        }
+
         if (base == 8)
         {
             *--first = '0';
@@ -166,6 +176,11 @@ auto operator<<(std::basic_ostream<charT, traits>& os, const LibIntegerType& v)
         {
             *--first = uppercase ? 'X' : 'x';
             *--first = '0';
+        }
+
+        if (negative)
+        {
+            *--first = '-';
         }
     }
 

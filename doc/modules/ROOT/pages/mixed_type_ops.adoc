@@ -200,6 +200,28 @@ BOOST_INT128_HOST_DEVICE constexpr Integer& operator|=(Integer& lhs, uint128 rhs
 
 A division or remainder by zero, and a shift count that is negative or at least the width of the promoted left operand, are undefined, exactly as for the built-in operators.
 
+[#mixed_ops_int128_uint128_compound]
+== Compound Assignment Between int128 and uint128
+
+`uint128 op= int128` needs no dedicated overload: the member `operator@=(uint128)` already exists, and the `int128` right operand converts to `uint128` first (a bit copy), landing directly in the domain the operation runs in.
+
+`int128 op= uint128` is different. Before the right operand could reach `int128`'s own `operator@=(int128)` member, it would first have to convert to `int128`, which is also a bit copy but changes how the value is interpreted for any operation that treats it as a number, division and remainder in particular: `-37 /= uint128{6}` would divide `-37` by the two's-complement reinterpretation of `6`, giving the right answer only by coincidence, and a different answer whenever the `uint128` right operand's top bit is set. `int128` therefore has its own dedicated overload for every compound assignment operator with a `uint128` right operand:
+
+[source, c++]
+----
+namespace boost {
+namespace int128 {
+
+BOOST_INT128_HOST_DEVICE constexpr int128& operator|=(int128& lhs, const uint128& rhs);
+// and likewise for &=, ^=, +=, -=, *=, /=, %=, <<=, >>=
+
+} // namespace int128
+} // namespace boost
+----
+
+Each of `pass:[|=]`, `pass:[&=]`, `pass:[^=]`, `pass:[+=]`, `pass:[-=]`, `pass:[*=]`, `pass:[/=]`, `pass:[%=]` converts `lhs` to `uint128`, performs the operation in the `uint128` domain (matching `pass:[__int128]` compound-assigned from `pass:[unsigned __int128]`), and converts the result back to `int128`, wrapping exactly as the built-in does.
+`pass:[<<=]` and `pass:[>>=]` are the shift exception described above: they delegate to `int128`'s own shift operators, so the value, the result type, and (for `pass:[>>=]`) the arithmetic-shift behavior all come from the `int128` left operand; only the shift count comes from `rhs`.
+
 [#mixed_ops_floating_point]
 == Operations With Floating-Point Types
 
