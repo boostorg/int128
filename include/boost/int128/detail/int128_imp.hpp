@@ -2475,7 +2475,8 @@ BOOST_INT128_HOST_DEVICE constexpr int128 operator%(const UnsignedInteger lhs, c
 
     const auto abs_rhs {abs(rhs)};
 
-    if (abs_rhs > lhs)
+    // abs(INT128_MIN) wraps back to INT128_MIN itself
+    if (abs_rhs.high != 0 || abs_rhs > lhs)
     {
         return lhs;
     }
