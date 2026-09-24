@@ -45,24 +45,72 @@ BOOST_INT128_HOST_DEVICE constexpr T unsigned_words_to_float_impl(const std::uin
 // as many as three times and lands up to one ulp away from the correctly rounded result.
 // Round the 128-bit value to exactly digits bits here instead, once, then apply an exact
 // power of two. See the note on ties in the body
+//
+// Every scale factor is checked against numeric_limits<T>::max_exponent before it is ever
+// materialized as a T, so a value too large for a narrow extended type (std::float16_t,
+// whose largest finite value is 65504) overflows to +infinity exactly the way a builtin
+// conversion does, rather than building an out of range floating-point constant, which is
+// undefined behavior and not a constant expression
 template <typename T>
 BOOST_INT128_HOST_DEVICE constexpr T unsigned_words_to_float_impl(const std::uint64_t high, const std::uint64_t low,
                                                                  std::false_type) noexcept
 {
-    // Anything below 2^64 is one conversion the compiler already rounds correctly
+    constexpr int digits {std::numeric_limits<T>::digits};
+
     if (high == UINT64_C(0))
     {
-        return static_cast<T>(low);
-    }
+        if (low == UINT64_C(0))
+        {
+            return T{0};
+        }
 
-    constexpr int digits {std::numeric_limits<T>::digits};
-    constexpr int residue_bits {64 - digits};
-    constexpr std::uint64_t residue_mask {(UINT64_C(1) << residue_bits) - UINT64_C(1)};
-    constexpr std::uint64_t halfway {UINT64_C(1) << (residue_bits - 1)};
+        const auto shift_lo {static_cast<unsigned>(countl_zero(low))};
+        const auto bit_length_lo {64 - static_cast<int>(shift_lo)};
+
+        if (bit_length_lo > std::numeric_limits<T>::max_exponent)
+        {
+            return std::numeric_limits<T>::infinity();
+        }
+
+        // low fits in digits bits exactly (no bit below the top bit_length_lo bits is
+        // ever set), so a single int to float conversion is already correctly rounded
+        // and, thanks to the check above, always in range
+        if (bit_length_lo <= digits)
+        {
+            return static_cast<T>(low);
+        }
+
+        constexpr int residue_bits_lo {64 - digits};
+        const std::uint64_t residue_mask_lo {(UINT64_C(1) << residue_bits_lo) - UINT64_C(1)};
+        const std::uint64_t halfway_lo {UINT64_C(1) << (residue_bits_lo - 1)};
+
+        const auto norm {low << shift_lo};
+        const auto significand_lo {norm >> residue_bits_lo};
+        const auto residue_lo {norm & residue_mask_lo};
+
+        const bool round_up_lo {residue_lo > halfway_lo ||
+                                (residue_lo == halfway_lo && (significand_lo & UINT64_C(1)) != UINT64_C(0))};
+
+        const auto rounded_lo {significand_lo + (round_up_lo ? UINT64_C(1) : UINT64_C(0))};
+
+        // bit_length_lo > digits here, so this exponent is always strictly positive
+        return static_cast<T>(rounded_lo) * exact_power_of_two<T>(bit_length_lo - digits);
+    }
 
     // Normalize so bit 127 of the pair is set, which puts the significand at the top of the
     // high word. high is non-zero here, so the distance is always less than 64
     const auto shift {static_cast<unsigned>(countl_zero(high))};
+    const auto bit_length {128 - static_cast<int>(shift)};
+
+    if (bit_length > std::numeric_limits<T>::max_exponent)
+    {
+        return std::numeric_limits<T>::infinity();
+    }
+
+    constexpr int residue_bits {64 - digits};
+    constexpr std::uint64_t residue_mask {(UINT64_C(1) << residue_bits) - UINT64_C(1)};
+    constexpr std::uint64_t halfway {UINT64_C(1) << (residue_bits - 1)};
+
     const auto norm_high {shift == 0U ? high : ((high << shift) | (low >> (64U - shift)))};
     const auto norm_low {shift == 0U ? low : (low << shift)};
 
@@ -79,9 +127,9 @@ BOOST_INT128_HOST_DEVICE constexpr T unsigned_words_to_float_impl(const std::uin
 
     // rounded holds digits bits, or digits + 1 when it carried, in which case it is a power of
     // two. Either way the conversion and the scaling are exact, so the product is the value
-    // rounded exactly once. It overflows to infinity precisely when the correctly rounded
-    // result does, which is the required behavior for round to nearest
-    return static_cast<T>(rounded) * exact_power_of_two<T>(static_cast<int>(64U - shift) + residue_bits);
+    // rounded exactly once. bit_length > digits always here (bit_length >= 65, and digits < 64
+    // is this overload's precondition), so the exponent is always strictly positive
+    return static_cast<T>(rounded) * exact_power_of_two<T>(bit_length - digits);
 }
 
 // Converts the 128-bit value (high, low) to T, correctly rounded to nearest with ties to even

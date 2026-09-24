@@ -159,6 +159,15 @@ uint128
     constexpr operator long double() const noexcept;
     #endif
 
+    // C++23 <stdfloat> extended types
+    #if !defined(BOOST_INT128_HAS_GPU_SUPPORT) && defined(BOOST_INT128_HAS_STDFLOAT)
+    template <typename ExtFloat, std::enable_if_t<detail::is_extended_floating_point_v<ExtFloat>, bool> = true>
+    BOOST_INT128_HOST_DEVICE constexpr operator ExtFloat() const noexcept
+    {
+        return detail::unsigned_words_to_float<ExtFloat>(high, low);
+    }
+    #endif
+
     // Compound OR
     template <BOOST_INT128_DEFAULTED_INTEGER_CONCEPT>
     BOOST_INT128_HOST_DEVICE constexpr uint128& operator|=(Integer rhs) noexcept;
@@ -400,29 +409,38 @@ constexpr uint128::operator long double() const noexcept
 template <BOOST_INT128_FLOATING_POINT_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr uint128::uint128(Float f) noexcept
 {
-    constexpr Float two_32 {static_cast<Float>(UINT64_C(1) << 32)};
-    constexpr Float two_64 {two_32 * two_32};
-
-    // !(f >= 0) catches both NaN and negative values without using <cmath>
-    if (!(f >= Float{0}))
+    // A type this narrow cannot hold the ladder's 2^32/2^64 scale constants below,
+    // so we must widen via cast first
+    BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Float>::max_exponent < 128)
     {
-        return;
+        *this = uint128(static_cast<float>(f));
     }
-
-    // Overflow test: f >= 2^128 iff f / 2^64 >= 2^64. Comparing scaled values
-    // avoids materializing 2^128 as a Float, which overflows to +infinity for
-    // `float` and is therefore not constant-evaluable on older compilers.
-    const Float scaled {f / two_64};
-    if (scaled >= two_64)
+    else
     {
-        high = UINT64_MAX;
-        low = UINT64_MAX;
-        return;
-    }
+        constexpr Float two_32 {static_cast<Float>(UINT64_C(1) << 32)};
+        constexpr Float two_64 {two_32 * two_32};
 
-    high = detail::float_to_uint64(scaled);
-    const Float remainder {f - static_cast<Float>(high) * two_64};
-    low = detail::float_to_uint64(remainder);
+        // !(f >= 0) catches both NaN and negative values without using <cmath>
+        if (!(f >= Float{0}))
+        {
+            return;
+        }
+
+        // Overflow test: f >= 2^128 iff f / 2^64 >= 2^64. Comparing scaled values
+        // avoids materializing 2^128 as a Float, which overflows to +infinity for
+        // `float` and is therefore not constant-evaluable on older compilers.
+        const Float scaled {f / two_64};
+        if (scaled >= two_64)
+        {
+            high = UINT64_MAX;
+            low = UINT64_MAX;
+            return;
+        }
+
+        high = detail::float_to_uint64(scaled);
+        const Float remainder {f - static_cast<Float>(high) * two_64};
+        low = detail::float_to_uint64(remainder);
+    }
 }
 
 //=====================================

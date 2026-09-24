@@ -404,6 +404,13 @@ constexpr int128::operator long double() const noexcept
 template <BOOST_INT128_FLOATING_POINT_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr int128::int128(Float f) noexcept
 {
+    // A type this narrow cannot hold the ladder's scale constants below
+    BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Float>::max_exponent < 128)
+    {
+        *this = int128(static_cast<float>(f));
+        return;
+    }
+
     constexpr Float two_32 {static_cast<Float>(UINT64_C(1) << 32)};
     constexpr Float two_64 {two_32 * two_32};
     constexpr Float two_127 {two_64 * static_cast<Float>(UINT64_C(1) << 63)};
