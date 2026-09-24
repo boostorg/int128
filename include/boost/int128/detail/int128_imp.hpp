@@ -135,9 +135,13 @@ int128
 
     #if defined(BOOST_INT128_HAS_INT128) || defined(BOOST_INT128_HAS_MSVC_INT128)
 
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_i128() const noexcept { return static_cast<detail::builtin_i128>(boost::int128_detail::builtin128_from_words(high, low)); }
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_u128() const noexcept { return boost::int128_detail::builtin128_from_words(high, low); }
+    #else
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_i128() const noexcept { return static_cast<detail::builtin_i128>(static_cast<detail::builtin_u128>(high) << static_cast<detail::builtin_u128>(64)) | static_cast<detail::builtin_i128>(low); }
-
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_u128() const noexcept { return (static_cast<detail::builtin_u128>(high) << static_cast<detail::builtin_u128>(64)) | static_cast<detail::builtin_u128>(low); }
+    #endif
 
     #endif // BOOST_INT128_HAS_INT128
 
@@ -978,6 +982,30 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering oper
     }
 }
 
+#if defined(BOOST_INT128_HAS_INT128) || defined(BOOST_INT128_HAS_MSVC_INT128)
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const int128 lhs, const detail::builtin_i128 rhs) noexcept
+{
+    return lhs <=> static_cast<int128>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const detail::builtin_i128 lhs, const int128 rhs) noexcept
+{
+    return static_cast<int128>(lhs) <=> rhs;
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const int128 lhs, const detail::builtin_u128 rhs) noexcept
+{
+    return lhs <=> static_cast<int128>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const detail::builtin_u128 lhs, const int128 rhs) noexcept
+{
+    return static_cast<int128>(lhs) <=> rhs;
+}
+
+#endif // BOOST_INT128_HAS_INT128
+
 BOOST_INT128_EXPORT template <BOOST_INT128_DEFAULTED_SIGNED_INTEGER_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering operator<=>(const int128 lhs, const SignedInteger rhs) noexcept
 {
@@ -1441,6 +1469,20 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR deta
 
 #endif
 
+#ifdef BOOST_INT128_HAS_MSVC_INT128
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR int128 operator<<(const int128 lhs, const detail::builtin_u128 rhs) noexcept
+{
+    return lhs << static_cast<std::uint64_t>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR int128 operator<<(const int128 lhs, const detail::builtin_i128 rhs) noexcept
+{
+    return lhs << static_cast<std::uint64_t>(rhs);
+}
+
+#endif // BOOST_INT128_HAS_MSVC_INT128
+
 // A shift takes its value and its result type from the left operand after integral promotion,
 // and only the count from the right, exactly as the builtin does
 
@@ -1632,6 +1674,20 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR deta
 }
 
 #endif
+
+#ifdef BOOST_INT128_HAS_MSVC_INT128
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR int128 operator>>(const int128 lhs, const detail::builtin_u128 rhs) noexcept
+{
+    return lhs >> static_cast<std::uint64_t>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR int128 operator>>(const int128 lhs, const detail::builtin_i128 rhs) noexcept
+{
+    return lhs >> static_cast<std::uint64_t>(rhs);
+}
+
+#endif // BOOST_INT128_HAS_MSVC_INT128
 
 // A shift takes its value and its result type from the left operand after integral promotion,
 // and only the count from the right, exactly as the builtin does

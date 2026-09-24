@@ -525,6 +525,60 @@ void test_ostream_showbase_zero()
     BOOST_TEST_CSTR_EQ(hex_one.str().c_str(), "0x1");
 }
 
+// F5 regression: std::internal was ignored for both uint128 and int128, and showpos
+// was ignored for int128. Ported from int256's test_signed_output_and_input /
+// test_width_and_fill, which cover the same defect
+void test_ostream_internal_and_showpos()
+{
+    // std::internal places the fill after the 0x prefix and before the digits,
+    // matching the builtin unsigned model exactly (checked against a live builtin at
+    // runtime rather than a hardcoded string, so this stays correct if the standard
+    // library's own placement rule is ever read differently than expected here)
+    {
+        std::ostringstream builtin_stream;
+        builtin_stream << std::internal << std::setw(8) << std::setfill('0')
+                       << std::hex << std::showbase << 255ULL;
+
+        std::ostringstream os;
+        os << std::internal << std::setw(8) << std::setfill('0')
+           << std::hex << std::showbase << boost::int128::uint128 {255U};
+
+        BOOST_TEST_EQ(os.str(), builtin_stream.str());
+        BOOST_TEST_EQ(os.str(), std::string {"0x0000ff"});
+    }
+
+    // std::internal places the fill between the sign and the digits, matching a
+    // builtin signed integer
+    {
+        std::ostringstream os;
+        os << std::internal << std::setw(6) << std::setfill('0') << boost::int128::int128 {-42};
+        BOOST_TEST_EQ(os.str(), std::string {"-00042"});
+    }
+
+    // showpos prints a '+' for a non-negative int128 in decimal only
+    {
+        std::ostringstream os;
+        os << std::showpos << boost::int128::int128 {42};
+        BOOST_TEST_EQ(os.str(), std::string {"+42"});
+    }
+
+    // With a base prefix, the fill goes after the sign and the prefix, before the
+    // magnitude digits
+    {
+        std::ostringstream os;
+        os << std::internal << std::setw(9) << std::setfill('0')
+           << std::hex << std::showbase << boost::int128::int128 {-255};
+        BOOST_TEST_EQ(os.str(), std::string {"-0x0000ff"});
+    }
+
+    // showpos's '+' is a sign for this purpose too
+    {
+        std::ostringstream os;
+        os << std::internal << std::showpos << std::setw(8) << std::setfill('0') << boost::int128::int128 {42};
+        BOOST_TEST_EQ(os.str(), std::string {"+0000042"});
+    }
+}
+
 int main()
 {
     test_istream<boost::int128::uint128>();
@@ -541,6 +595,8 @@ int main()
 
     test_ostream_showbase_zero<boost::int128::uint128>();
     test_ostream_showbase_zero<boost::int128::int128>();
+
+    test_ostream_internal_and_showpos();
 
     // 32-bit windows does not set the iomanip flags correctly in CI
     #ifndef _M_IX86

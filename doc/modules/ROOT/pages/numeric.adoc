@@ -291,7 +291,7 @@ An exact tie is only possible when the divisor is even, so the six `ties_` modes
 === Semantics
 
 The remainder returned by `div_rem_<mode>` is the one that matches the quotient: `x == quotient * y + remainder` for the signed overloads.
-For the unsigned overloads the same identity holds modulo 2^128^, because a quotient rounded up leaves a negative remainder that has to wrap; `div_rem_away_zero(uint128{7}, uint128{2})` therefore returns a quotient of `4` and a remainder of `BOOST_INT128_UINT128_MAX`, since `7 - 4 * 2` is `-1`.
+For the unsigned overloads the same identity holds modulo 2^128^, because a quotient rounded up leaves a negative remainder that has to wrap; `pass:[div_rem_away_zero(uint128{7}, uint128{2})]` therefore returns a quotient of `4` and a remainder of `BOOST_INT128_UINT128_MAX`, since `7 - 4 * 2` is `-1`.
 The quotient itself never overflows: rounding only moves the quotient when the division is inexact, and an inexact division has a divisor whose magnitude is at least two.
 
 The unsigned overloads exist for every mode, but a non-negative quotient collapses several of them together.

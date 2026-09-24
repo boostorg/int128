@@ -16,7 +16,9 @@
 #include <type_traits>
 #include <iostream>
 #include <iomanip>
+#include <cstddef>
 #include <cstring>
+#include <limits>
 
 #endif
 
@@ -45,12 +47,12 @@ BOOST_INT128_EXPORT template <typename charT, typename traits, typename LibInteg
 auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
     -> std::enable_if_t<detail::is_streamable_overload_v<LibIntegerType>, std::basic_istream<charT, traits>&>
 {
-    charT t_buffer[64] {};
-    is >> std::ws >> std::setw(63) >> t_buffer;
+    charT t_buffer[detail::mini_to_chars_buffer_size] {};
+    is >> std::ws >> std::setw(static_cast<int>(detail::mini_to_chars_buffer_size) - 1) >> t_buffer;
 
     const auto t_buffer_len {std::char_traits<charT>::length(t_buffer)};
 
-    char buffer[64] {};
+    char buffer[detail::mini_to_chars_buffer_size] {};
     auto buffer_start {buffer};
 
     BOOST_INT128_IF_CONSTEXPR (!std::is_same<charT, char>::value)
@@ -66,11 +68,14 @@ auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
     }
     else
     {
-        std::memcpy(buffer, t_buffer, sizeof(t_buffer));
+        std::memcpy(buffer, t_buffer, sizeof(buffer));
     }
 
     const auto flags {is.flags()};
     int base {10};
+
+    std::size_t removed_prefix_chars {0};
+
     if (flags & std::ios_base::oct)
     {
         // No prefix is stripped: in base 8 a leading zero is already an ordinary digit,
@@ -82,29 +87,43 @@ auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
     {
         base = 16;
 
-        // Skip an explicit 0x or 0X prefix, and never a bare leading zero, which
-        // would swallow the first digit of a value such as 0f
-        if (buffer_start[0] == '0' && (buffer_start[1] == 'x' || buffer_start[1] == 'X'))
+        // The 0x/0X prefix can follow a leading sign ("-0x1a")
+        auto digit_scan {buffer_start};
+
+        BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<LibIntegerType>::is_signed)
         {
-            buffer_start += 2;
+            if (*digit_scan == '-')
+            {
+                ++digit_scan;
+            }
+        }
+
+        if (digit_scan[0] == '0' && (digit_scan[1] == 'x' || digit_scan[1] == 'X'))
+        {
+            char* dst {digit_scan};
+            char* src {digit_scan + 2};
+
+            while (*src != '\0')
+            {
+                *dst++ = *src++;
+            }
+
+            *dst = '\0';
+            removed_prefix_chars = 2U;
         }
     }
 
-    const auto prefix_length {static_cast<std::size_t>(buffer_start - buffer)};
-
     const auto r {detail::from_chars(buffer_start, buffer + detail::strlen(buffer), v, base)};
 
-    // Put back unconsumed characters. Only a strictly negative r means digits were
-    // extracted, and then -r digits were consumed on top of any base prefix. Anything
-    // else consumed nothing at all, so even the prefix goes back.
+    // Put back unconsumed characters
     std::size_t consumed {};
     if (r < 0)
     {
-        consumed = prefix_length + static_cast<std::size_t>(-r);
+        consumed = removed_prefix_chars + static_cast<std::size_t>(-r);
     }
 
     BOOST_INT128_ASSERT(t_buffer_len >= consumed);
-    const auto return_chars {static_cast<std::size_t>(t_buffer_len - consumed)};
+    const auto return_chars {t_buffer_len - consumed};
 
     for (std::size_t i {}; i < return_chars; ++i)
     {
@@ -153,52 +172,117 @@ auto operator<<(std::basic_ostream<charT, traits>& os, const LibIntegerType& v)
         uppercase = true;
     }
 
-    auto first {detail::mini_to_chars(buffer, v, base, uppercase)};
+    // mini_to_chars already writes a leading '-' for a negative int128
+    auto digits_first {detail::mini_to_chars(buffer, v, base, uppercase)};
+    const bool negative {*digits_first == '-'};
+
+    if (negative)
+    {
+        ++digits_first;
+    }
+
+    // "head" is the sign and the base prefix, kept as its own short run so that
+    // std::internal can place the fill between it and the digits; the digits
+    // themselves never move, unlike an earlier version of this function that spliced
+    // the prefix in front of an already-written sign, which gave "0x-ff" instead of
+    // "-0xff"
+    char head[3] {};
+    std::size_t head_len {0};
+
+    if (negative)
+    {
+        head[head_len++] = '-';
+    }
+    else
+    {
+        // showpos prints a '+' for a non-negative int128 in decimal only, exactly like
+        // the builtin signed integer types; uint128 (is_signed false) never prints one
+        BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<LibIntegerType>::is_signed)
+        {
+            if ((flags & std::ios_base::showpos) && base == 10)
+            {
+                head[head_len++] = '+';
+            }
+        }
+    }
 
     // A zero prints as a bare "0" with showbase, the same as the builtin types
     if ((flags & std::ios_base::showbase) && v != 0U)
     {
-        // mini_to_chars writes the sign, if any, before the digits. Step past it
-        // before prepending the base prefix, so the prefix lands between the sign
-        // and the digits, then restore the sign in front of the prefix: "-0xff",
-        // not "0x-ff".
-        const bool negative {*first == '-'};
-        if (negative)
-        {
-            ++first;
-        }
-
         if (base == 8)
         {
-            *--first = '0';
+            head[head_len++] = '0';
         }
         else if (base == 16)
         {
-            *--first = uppercase ? 'X' : 'x';
-            *--first = '0';
-        }
-
-        if (negative)
-        {
-            *--first = '-';
+            head[head_len++] = '0';
+            head[head_len++] = uppercase ? 'X' : 'x';
         }
     }
+
+    const auto digits_len {static_cast<std::size_t>(detail::strlen(digits_first))};
+    const auto total_len {head_len + digits_len};
+
+    // A formatted output function always consumes the requested width, whether or not
+    // any padding is actually needed
+    const auto requested_width {os.width()};
+    os.width(0);
+    const std::size_t pad {(requested_width > 0 && static_cast<std::size_t>(requested_width) > total_len) ?
+                            static_cast<std::size_t>(requested_width) - total_len : std::size_t{0}};
+
+    const charT fill_char {os.fill()};
+    const auto adjust {flags & std::ios_base::adjustfield};
+
+    charT t_head[3] {};
+    charT t_digits[detail::mini_to_chars_buffer_size] {};
 
     BOOST_INT128_IF_CONSTEXPR (!std::is_same<charT, char>::value)
     {
-        charT t_buffer[64U] {};
-
-        auto t_first {t_buffer};
-        while (*first != '\0')
+        for (std::size_t i {}; i < head_len; ++i)
         {
-            *t_first++ = static_cast<charT>(*first++);
+            t_head[i] = static_cast<charT>(head[i]);
         }
 
-        os << t_buffer;
+        for (std::size_t i {}; i < digits_len; ++i)
+        {
+            t_digits[i] = static_cast<charT>(digits_first[i]);
+        }
     }
     else
     {
-        os << first;
+        std::memcpy(t_head, head, head_len);
+        std::memcpy(t_digits, digits_first, digits_len);
+    }
+
+    // Unformatted output (write, put): the width was already consumed above, so using
+    // the formatted inserters here would pad a second time
+    const auto write_fill = [&os, fill_char](const std::size_t n)
+    {
+        for (std::size_t i {}; i < n; ++i)
+        {
+            os.put(fill_char);
+        }
+    };
+
+    if (adjust == std::ios_base::left)
+    {
+        os.write(t_head, static_cast<std::streamsize>(head_len));
+        os.write(t_digits, static_cast<std::streamsize>(digits_len));
+        write_fill(pad);
+    }
+    else if (adjust == std::ios_base::internal)
+    {
+        os.write(t_head, static_cast<std::streamsize>(head_len));
+        write_fill(pad);
+        os.write(t_digits, static_cast<std::streamsize>(digits_len));
+    }
+    else
+    {
+        // right, or no adjustfield flag set: the builtin signed and unsigned integer
+        // types both pad before the whole sign-and-prefix-and-digits sequence here
+        write_fill(pad);
+        os.write(t_head, static_cast<std::streamsize>(head_len));
+        os.write(t_digits, static_cast<std::streamsize>(digits_len));
     }
 
     return os;

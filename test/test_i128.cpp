@@ -1216,7 +1216,16 @@ void test_min_divisor()
     BOOST_TEST(negative_value / min_val == 0);
 }
 
-template <typename IntType, std::enable_if_t<boost::int128::detail::is_unsigned_integer_v<IntType>, bool> = true>
+// On MSVC, detail::builtin_u128 (std::_Unsigned128) is in the test_types list below,
+// but is_unsigned_integer_v only recognizes it under BOOST_INT128_HAS_INT128 (the
+// GCC/clang __int128 path), so it needs to be named explicitly here. The builtin_u128
+// % and / overloads against int128 exist under BOOST_INT128_HAS_MSVC_INT128 too (see
+// conversions.hpp), so this is not a functionality gap, only a missing trait entry.
+template <typename IntType, std::enable_if_t<boost::int128::detail::is_unsigned_integer_v<IntType>
+#ifdef BOOST_INT128_HAS_MSVC_INT128
+    || std::is_same<IntType, boost::int128::detail::builtin_u128>::value
+#endif
+    , bool> = true>
 void test_min_divisor()
 {
     const auto min_val {std::numeric_limits<boost::int128::int128>::min()};

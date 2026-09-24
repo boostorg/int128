@@ -36,6 +36,17 @@ std::basic_istream<charT, traits>& operator>>(std::basic_istream<charT, traits>&
 } // namespace boost
 ----
 
+These are host-only functions: they are not annotated with `BOOST_INT128_HOST_DEVICE` and are not available in device code.
+
+[#stream_sign]
+== Sign, Base Prefix and `showpos`
+
+`int128` is sign-magnitude in every base: on output, the sign (if any) is written first, before any base prefix from `showbase`, so `-0xff` and `-0377`, never `0x-ff`.
+`std::showpos` prints a leading `+` for a non-negative `int128` in decimal only; it has no effect in `hex` or `oct` mode, and it has no effect on `uint128` at all, matching the built-in unsigned types.
+
+On extraction, `operator>>` accepts an optional leading `-` before the digits (and before a `0x` or `0` prefix, when the active base allows one) but rejects a leading `+`, matching `from_chars`.
+A value outside `int128`'s range, including one whose magnitude overflows during the parse, sets `failbit`.
+
 == Flags
 
 [#ios]
@@ -55,6 +66,8 @@ A bare leading zero is an ordinary digit in every base, so `0f` in hexadecimal i
 Extraction stops at the first character that is not a digit in the active base and leaves it in the stream.
 If no digit could be extracted, or the value does not fit in the target type, `failbit` is set, the target is set to zero, and every character is left in the stream, so `while (is >> value)` terminates as it does for the builtin integer types.
 On insertion (`operator<<`) `showbase` adds no prefix to a zero, again matching the builtin types.
-For a negative `int128` value, the sign is written before the base prefix, not after it: `std::hex << std::showbase << int128{-255}` prints `-0xff`, not `0x-ff`.
+For a negative `int128` value, the sign is written before the base prefix, not after it: `pass:[std::hex << std::showbase << int128{-255}]` prints `-0xff`, not `0x-ff`.
+
+The width and fill manipulators (`std::setw`, `std::setfill`) work with `std::left`, `std::right`, and `std::internal` exactly as they do for the built-in integer types: `std::left` and `std::right` pad before or after the whole output (sign and base prefix included), while `std::internal` places the fill between the sign/prefix and the digits. `pass:[std::setw(12) << std::internal << std::hex << std::showbase << int128{-255}]` prints `"-0x       ff"`, not `"-0xff       "` (`std::left`) or `"       -0xff"` (`std::right`).
 
 See the xref:examples.adoc#examples_io[IO streaming example] for usage demonstrations.

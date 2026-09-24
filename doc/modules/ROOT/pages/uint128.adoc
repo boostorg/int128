@@ -73,7 +73,7 @@ Specifically:
 * Every compound assignment operator is also defined with the built-in integer on the left and the `uint128` on the right, in which case `i op= v` is `i = static_cast<decltype(i)>(i op v)`: the operation is performed in the common type and only the result is converted back, so the left operand keeps its own type. See xref:mixed_type_ops.adoc#mixed_ops_integer_compound[Compound Assignment onto a Built-in Integer].
 * A floating-point operand is the common type: the `uint128` is converted to it first and the operation is performed in floating point, so the result of an arithmetic operator is the floating-point type, not `uint128`. The modulo, bitwise, and shift operators reject a floating-point operand, as the built-in does. See xref:mixed_type_ops.adoc#mixed_ops_floating_point[Operations With Floating-Point Types].
 
-For example, `uint128{5} > -1` returns `false` because the signed `-1` converts to a value greater than `5` under unsigned 128-bit arithmetic, exactly as `(unsigned __int128){5} > -1` would.
+For example, `pass:[uint128{5} > -1]` returns `false` because the signed `-1` converts to a value greater than `5` under unsigned 128-bit arithmetic, exactly as `pass:[(unsigned __int128){5} > -1]` would.
 
 NOTE: The results match `unsigned __int128` for every input with a non-zero divisor. Division or remainder by zero is the one exception, and it is handled exactly as the built-in type handles it: as undefined behavior. The library performs no zero-divisor check, so a `uint128` divided or taken modulo by zero behaves like the built-in operation (a hardware trap on platforms that fault on integer division by zero), and in a constant expression it is a hard compile-time error just as `1u / 0u` is. See xref:uint128.adoc#u128_math_operators[Division] and Modulo below.
 
@@ -181,6 +181,10 @@ Conversions to floating-point types may not be lossless depending on the value o
 as the number of digits it represents can exceed the precision of the significand in floating point types.
 When the value does not fit the significand it is rounded once, to nearest with ties to even, which is the same result `static_cast<unsigned __int128>` produces, and a value above the range of the target type becomes infinity.
 This holds whether or not the compiler provides a built-in 128-bit integer: where it does the conversion is the compiler's own, and where it does not the portable path rounds identically.
+
+`uint128` also converts to a pass:[C++23] `<stdfloat>` extended type (`std::float16_t`, `float32_t`, `float64_t`, `float128_t`, `bfloat16_t`) when the standard library provides it: host only, and only under pass:[C++23] or later on a toolchain whose standard library actually ships `<stdfloat>` with that specific type (GCC 13 and later with libstdc++; as of this writing, libc++ and MSVC's standard library do not yet provide it, so those types are simply absent from `uint128` there, not merely disabled). The conversion is correctly rounded exactly as above, so the narrowest of these, `std::float16_t` (8-bit significand, no value above 65504), overflows to infinity for any `uint128` past that point.
+
+CAUTION: Under `-ffast-math`, `-ffinite-math-only`, or the Intel compiler's default `-fp-model=fast`, the compiler may assume no floating-point operand is ever NaN or infinity, so a conversion *from* one of those values gives unspecified results. Use `-fp-model=precise` with `icpx` when NaN or infinity handling matters.
 
 [#u128_comparison_operators]
 == Comparison Operators

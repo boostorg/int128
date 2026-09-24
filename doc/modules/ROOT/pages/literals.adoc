@@ -66,13 +66,37 @@ Digit separators (`'`) may be used in any base.
 "-0b1010"_i128      // == -10 (the string form may embed the sign)
 ----
 
+A *raw* (unquoted) `_i128` literal never sees a leading `-`: `-X_i128` is the unary minus operator applied to the result of `X_i128`, exactly as `-9223372036854775808LL` is unary minus applied to `9223372036854775808LL`.
+So `X` itself, with no sign, has to fit in `int128`'s positive range in whichever base it is written, the same rule a built-in literal follows.
+This means the *positive* magnitude of the minimum value, `2^127^`, is one more than `INT128_MAX`, so all of the following are ill-formed and none of them may wrap to a valid value:
+
+[source, c++]
+----
+170141183460469231731687303715884105728_i128           // 2^127, ill-formed: > MAX
+0x80000000000000000000000000000000_i128                // 2^127, ill-formed: > MAX
+0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF_i128                 // 2^128 - 1, ill-formed: > MAX
+----
+
+A *quoted* string literal is different: the sign is part of the digit sequence the operator receives, so it is parsed together with the magnitude, which range-checks the *signed* value directly (allowing a magnitude up to `2^127^` when the sign is negative, and up to `2^127^ - 1` when it is not).
+The macro form stringifies its whole argument, sign included, so it gets the same treatment.
+These are the only ways to reach the minimum value directly:
+
+[source, c++]
+----
+BOOST_INT128_INT128_MIN
+BOOST_INT128_INT128_C(-170141183460469231731687303715884105728)
+BOOST_INT128_INT128_C(-0x80000000000000000000000000000000)
+"-0x80000000000000000000000000000000"_i128
+"-170141183460469231731687303715884105728"_i128
+----
+
 == Error Handling
 
 An invalid literal is rejected at compile time rather than being silently accepted.
 This includes a value that overflows the target type, a digit that is not valid for the selected base (for example `0b2` or `09`), and an empty magnitude such as `0x`.
 When such a literal is used in a constant expression the parse reaches `BOOST_INT128_UNREACHABLE`, which is not a constant expression and therefore is a hard compile error.
 
-NOTE: The minimum `int128` value cannot be written as a negated `_i128` literal, because its positive magnitude (2^127) exceeds the maximum `int128` value and so fails to parse (a hard compile error in a constant expression). Use `BOOST_INT128_INT128_C(-170141183460469231731687303715884105728)`, the string form `"-170141183460469231731687303715884105728"_i128`, or `(std::numeric_limits<int128>::min)()` instead.
+NOTE: The minimum `int128` value cannot be written as a negated raw `_i128` literal for the reason given above: its positive magnitude (`2^127^`) exceeds `INT128_MAX`, so the literal is rejected before the unary minus ever applies. Use `BOOST_INT128_INT128_MIN`, one of the string or macro forms shown above, or `(std::numeric_limits<int128>::min)()` instead.
 
 See the xref:examples.adoc#examples_construction[construction examples] for usage demonstrations of both literals and macros.
 

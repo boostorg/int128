@@ -212,7 +212,7 @@ void test_from_float_saturation()
     const Float inf {std::numeric_limits<Float>::infinity()};
 
     const uint128 u_max {~static_cast<std::uint64_t>(0), ~static_cast<std::uint64_t>(0)};
-    const int128 i_max {static_cast<std::int64_t>(INT64_MAX), UINT64_MAX};
+    const int128 i_max {INT64_MAX, UINT64_MAX};
     const int128 i_min {static_cast<std::int64_t>(UINT64_C(0x8000000000000000)), UINT64_C(0)};
 
     // NaN yields zero for both types
