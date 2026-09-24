@@ -47,46 +47,46 @@ BOOST_INT128_HOST_DEVICE constexpr uint128::uint128(const int128& v) noexcept : 
 #pragma warning(disable: 4127)
 #endif
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr bool operator==(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr bool operator==(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) == static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr bool operator!=(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr bool operator!=(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) != static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr bool operator<(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr bool operator<(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) < static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr bool operator<=(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr bool operator<=(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) <= static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr bool operator>(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr bool operator>(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) > static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr bool operator>=(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr bool operator>=(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) >= static_cast<uint128>(rhs);
 }
 
 #ifdef BOOST_INT128_HAS_SPACESHIP_OPERATOR
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering operator<=>(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering operator<=>(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) <=> static_cast<uint128>(rhs);
 }
@@ -97,32 +97,32 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering oper
 // Arithmetic Operators
 //=====================================
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator+(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator+(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) + static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator-(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator-(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) - static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator*(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator*(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) * static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator/(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator/(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) / static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator%(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator%(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) % static_cast<uint128>(rhs);
 }
@@ -131,20 +131,20 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator%(const T
 // Cross-type Bitwise Operators
 //=====================================
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator|(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator|(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) | static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator&(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator&(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) & static_cast<uint128>(rhs);
 }
 
-template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
-BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator^(const T lhs, const U rhs) noexcept
+BOOST_INT128_EXPORT template <typename T, typename U, std::enable_if_t<detail::is_valid_overload_v<T> && detail::is_valid_overload_v<U> && !std::is_same<T, U>::value, bool> = true>
+BOOST_INT128_HOST_DEVICE constexpr uint128 operator^(const T lhs, const U rhs) noexcept
 {
     return static_cast<uint128>(lhs) ^ static_cast<uint128>(rhs);
 }
