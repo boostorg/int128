@@ -55,20 +55,15 @@ auto operator>>(std::basic_istream<charT, traits>& is, LibIntegerType& v)
     char buffer[detail::mini_to_chars_buffer_size] {};
     auto buffer_start {buffer};
 
-    BOOST_INT128_IF_CONSTEXPR (!std::is_same<charT, char>::value)
-    {
-        auto first {buffer};
-        auto t_first {t_buffer};
-        const auto t_buffer_end {t_buffer + detail::strlen(t_buffer)};
+    // Narrowed element by element even for char: a std::memcpy here makes GCC 15 ICE
+    // (nonnull_arg_p) when this is instantiated from the module in a consumer
+    auto first {buffer};
+    auto t_first {t_buffer};
+    const auto t_buffer_end {t_buffer + detail::strlen(t_buffer)};
 
-        while (t_first != t_buffer_end)
-        {
-            *first++ = static_cast<char>(*t_first++);
-        }
-    }
-    else
+    while (t_first != t_buffer_end)
     {
-        std::memcpy(buffer, t_buffer, sizeof(buffer));
+        *first++ = static_cast<char>(*t_first++);
     }
 
     const auto flags {is.flags()};
@@ -236,22 +231,16 @@ auto operator<<(std::basic_ostream<charT, traits>& os, const LibIntegerType& v)
     charT t_head[3] {};
     charT t_digits[detail::mini_to_chars_buffer_size] {};
 
-    BOOST_INT128_IF_CONSTEXPR (!std::is_same<charT, char>::value)
+    // Widened element by element even for char: a std::memcpy here makes GCC 15 ICE
+    // (nonnull_arg_p) when this is instantiated from the module in a consumer
+    for (std::size_t i {}; i < head_len; ++i)
     {
-        for (std::size_t i {}; i < head_len; ++i)
-        {
-            t_head[i] = static_cast<charT>(head[i]);
-        }
-
-        for (std::size_t i {}; i < digits_len; ++i)
-        {
-            t_digits[i] = static_cast<charT>(digits_first[i]);
-        }
+        t_head[i] = static_cast<charT>(head[i]);
     }
-    else
+
+    for (std::size_t i {}; i < digits_len; ++i)
     {
-        std::memcpy(t_head, head, head_len);
-        std::memcpy(t_digits, digits_first, digits_len);
+        t_digits[i] = static_cast<charT>(digits_first[i]);
     }
 
     // Unformatted output (write, put): the width was already consumed above, so using
