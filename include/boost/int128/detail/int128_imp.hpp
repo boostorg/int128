@@ -414,6 +414,11 @@ constexpr int128::operator long double() const noexcept
 // NaN -> 0;
 // f >= 2^127 -> INT128_MAX;
 // f < -2^127 -> INT128_MIN.
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4127) // Conditional expression is constant pre-C++17
+#endif
+
 template <BOOST_INT128_FLOATING_POINT_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr int128::int128(Float f) noexcept
 {
@@ -468,6 +473,10 @@ BOOST_INT128_HOST_DEVICE constexpr int128::int128(Float f) noexcept
     high = h;
     low = l;
 }
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 //=====================================
 // Unary Operators
@@ -1322,7 +1331,7 @@ namespace detail {
 template <typename Integer>
 BOOST_INT128_HOST_DEVICE constexpr int128 default_ls_impl(const int128 lhs, const Integer rhs) noexcept
 {
-    static_assert(std::is_integral<Integer>::value, "Only builtin types allowed");
+    static_assert(detail::is_any_integer_v<Integer>, "Only builtin types allowed");
 
     // A shift by a negative amount or by an amount >= 128 (the operand width) is
     // undefined behavior, exactly as for the built-in shift operators. In a

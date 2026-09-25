@@ -448,6 +448,11 @@ constexpr uint128::operator long double() const noexcept
 // Inverse of operator(Float): decompose f into (high, low) by dividing by 2^64.
 // NaN/negative -> 0
 // overflow -> UINT128_MAX.
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4127) // Conditional expression is constant pre-C++17
+#endif
+
 template <BOOST_INT128_FLOATING_POINT_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr uint128::uint128(Float f) noexcept
 {
@@ -484,6 +489,10 @@ BOOST_INT128_HOST_DEVICE constexpr uint128::uint128(Float f) noexcept
         low = detail::float_to_uint64(remainder);
     }
 }
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 //=====================================
 // Unary Operators
@@ -1560,7 +1569,7 @@ namespace detail {
 template <typename Integer>
 BOOST_INT128_HOST_DEVICE constexpr uint128 default_ls_impl(const uint128 lhs, const Integer rhs) noexcept
 {
-    static_assert(std::is_integral<Integer>::value, "Needs to be a builtin type");
+    static_assert(detail::is_any_integer_v<Integer>, "Needs to be a builtin type");
 
     // A shift by a negative amount or by an amount >= 128 (the operand width) is
     // undefined behavior, exactly as for the built-in shift operators. In a
@@ -1847,7 +1856,7 @@ BOOST_INT128_HOST_DEVICE uint128 intrinsic_rs_impl(const uint128 lhs, const Inte
 
 } // namespace detail
 
-BOOST_INT128_EXPORT template <typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
+BOOST_INT128_EXPORT template <BOOST_INT128_DEFAULTED_INTEGER_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr uint128 operator>>(const uint128 lhs, const Integer rhs) noexcept
 {
     #ifndef BOOST_INT128_NO_CONSTEVAL_DETECTION
