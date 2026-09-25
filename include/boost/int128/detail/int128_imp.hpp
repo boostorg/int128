@@ -1499,7 +1499,10 @@ BOOST_INT128_EXPORT template <typename Integer, std::enable_if_t<detail::is_any_
 BOOST_INT128_HOST_DEVICE constexpr detail::promoted_t<Integer> operator<<(const Integer lhs, const int128 rhs) noexcept
 {
     // Out-of-range counts are undefined, matching the built-in operators.
-    return static_cast<detail::promoted_t<Integer>>(lhs) << rhs.low;
+    // Shifted in the unsigned domain: a negative left operand then gets the C++20
+    // result in every language mode instead of undefined behavior before C++20
+    using promoted = detail::promoted_t<Integer>;
+    return static_cast<promoted>(static_cast<std::make_unsigned_t<promoted>>(static_cast<promoted>(lhs)) << rhs.low);
 }
 
 #ifdef _MSC_VER
