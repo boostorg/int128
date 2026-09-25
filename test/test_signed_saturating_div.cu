@@ -51,6 +51,15 @@ int main(void)
         } while (input_vector2[i] == 0);
     }
 
+    // Force the one input saturating_div actually saturates on (MIN / -1, which the
+    // plain operator wraps to MIN but saturating_div clamps to MAX) onto the device
+    // path every run, not only when a random draw happens to land on it.
+    if (numElements > 0)
+    {
+        input_vector[0] = (std::numeric_limits<test_type>::min)();
+        input_vector2[0] = test_type{-1};
+    }
+
     int threadsPerBlock = 256;
     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
     std::cout << "CUDA kernel launch with " << blocksPerGrid << " blocks of " << threadsPerBlock << " threads" << std::endl;

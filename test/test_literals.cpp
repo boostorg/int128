@@ -161,6 +161,14 @@ void test_i128_base_prefixes()
     const boost::int128::int128 max_val {std::numeric_limits<boost::int128::int128>::max()};
     BOOST_TEST(max_val == 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF_i128);
 
+    // F4 regression: a prefixed literal used to parse its magnitude straight into
+    // the signed type, which range checked against int128::max() and rejected
+    // 0x800...0 (2^127, MIN's own magnitude) as out of range even though the
+    // sign below makes it exactly MIN. Ported from int256's test_literals.cpp
+    const boost::int128::int128 min_val {std::numeric_limits<boost::int128::int128>::min()};
+    BOOST_TEST(min_val == BOOST_INT128_INT128_C(-0x80000000000000000000000000000000));
+    BOOST_TEST(min_val == "-0x80000000000000000000000000000000"_i128);
+
     // MSVC 14.1 ICE
     #if !defined(_MSC_VER) || _MSC_VER >= 1920
     static_assert(-0x10_i128 == boost::int128::int128{-16}, "constexpr signed hex");

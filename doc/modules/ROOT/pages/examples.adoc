@@ -415,7 +415,7 @@ ckd_mul<uint8_t>(20, 20): overflow=true, wrapped=144
 
 128-bit values rarely appear on their own; in practice they get added to loop counters and compared against small constants.
 Every arithmetic, bitwise, comparison, and shift operator is therefore defined between the 128-bit types and any built-in integer type, signed or unsigned, following the usual arithmetic conversions.
-That includes compound assignment with the built-in integer on the left, such as `i pass:[|=] uint128{1}`, which keeps the type of `i`.
+That includes compound assignment with the built-in integer on the left, such as `pass:[i |= uint128{1}]`, which keeps the type of `i`.
 The floating-point types are covered separately in xref:examples.adoc#examples_mixed_float[Mixed Floating-Point Arithmetic] below.
 See xref:mixed_type_ops.adoc[Mixed Type Operations] for the full set of conversion rules that this example exercises.
 

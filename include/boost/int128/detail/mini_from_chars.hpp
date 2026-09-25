@@ -371,8 +371,8 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
         return parse_value;
     }
 
-    // Prefixed: parse the magnitude in the detected base, then reapply the sign.
-    const auto status = from_chars_literal(next, last, parse_value, base);
+    uint128 magnitude {};
+    const auto status = from_chars_literal(next, last, magnitude, base);
     if (status == EDOM)
     {
         BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
@@ -382,6 +382,19 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
         BOOST_INT128_REJECT_LITERAL(parse_invalid_literal);
     }
 
+    BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Integer>::is_signed)
+    {
+        const uint128 limit {negative ? static_cast<uint128>((std::numeric_limits<Integer>::max)()) + UINT64_C(1)
+                                       : static_cast<uint128>((std::numeric_limits<Integer>::max)())};
+
+        if (magnitude > limit)
+        {
+            BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
+        }
+    }
+
+    parse_value = static_cast<Integer>(magnitude);
+
     if (negative)
     {
         BOOST_INT128_IF_CONSTEXPR (std::numeric_limits<Integer>::is_signed)
@@ -390,7 +403,7 @@ BOOST_INT128_HOST_DEVICE constexpr Integer parse_literal(const char* first, cons
         }
         else
         {
-            BOOST_INT128_UNREACHABLE;
+            BOOST_INT128_REJECT_LITERAL(parse_literal_out_of_range);
         }
     }
 

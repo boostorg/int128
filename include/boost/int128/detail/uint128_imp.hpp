@@ -73,6 +73,21 @@ uint128
 
     #if defined(BOOST_INT128_HAS_INT128) || defined(BOOST_INT128_HAS_MSVC_INT128)
 
+    // On MSVC, the shift below is routed through the isolated-namespace helper
+    // (see config.hpp) rather than a plain infix >>, to avoid an ambiguity between
+    // this library's own operator>> and std::_Unsigned128/_Signed128's hidden friend
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_i128 v) noexcept :
+        low {static_cast<std::uint64_t>(v)},
+        high {static_cast<std::uint64_t>(boost::int128_detail::builtin128_shr_u(static_cast<detail::builtin_u128>(v), 64U))} {}
+
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_u128 v) noexcept :
+        low {static_cast<std::uint64_t>(v)},
+        high {static_cast<std::uint64_t>(boost::int128_detail::builtin128_shr_u(v, 64U))} {}
+
+    #else
+
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_i128 v) noexcept :
         low {static_cast<std::uint64_t>(v)},
         high {static_cast<std::uint64_t>(static_cast<detail::builtin_u128>(v) >> static_cast<detail::builtin_u128>(64U))} {}
@@ -80,6 +95,8 @@ uint128
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_u128 v) noexcept :
         low {static_cast<std::uint64_t>(v)},
         high {static_cast<std::uint64_t>(v >> static_cast<detail::builtin_i128>(64U))} {}
+
+    #endif // BOOST_INT128_HAS_MSVC_INT128
 
     #endif // BOOST_INT128_HAS_INT128
 
@@ -95,6 +112,18 @@ uint128
 
     #if defined(BOOST_INT128_HAS_INT128) || defined(BOOST_INT128_HAS_MSVC_INT128)
 
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_i128 v) noexcept :
+        high {static_cast<std::uint64_t>(boost::int128_detail::builtin128_shr_u(static_cast<detail::builtin_u128>(v), 64U))},
+        low {static_cast<std::uint64_t>(v)} {}
+
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_u128 v) noexcept :
+        high {static_cast<std::uint64_t>(boost::int128_detail::builtin128_shr_u(v, 64U))},
+        low {static_cast<std::uint64_t>(v)} {}
+
+    #else
+
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_i128 v) noexcept :
         high {static_cast<std::uint64_t>(static_cast<detail::builtin_u128>(v) >> 64U)},
         low {static_cast<std::uint64_t>(v)} {}
@@ -102,6 +131,8 @@ uint128
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128(const detail::builtin_u128 v) noexcept :
         high {static_cast<std::uint64_t>(v >> 64U)},
         low {static_cast<std::uint64_t>(v)} {}
+
+    #endif // BOOST_INT128_HAS_MSVC_INT128
 
     #endif // BOOST_INT128_HAS_INT128
 
@@ -141,9 +172,20 @@ uint128
 
     #if defined(BOOST_INT128_HAS_INT128) || defined(BOOST_INT128_HAS_MSVC_INT128)
 
+    // boost::int128_detail::builtin128_from_words (a sibling of boost::int128, see
+    // config.hpp) is used here instead of the plain infix `<<`/`|`, on the MSVC path
+    // only. Unqualified lookup for those operators from inside namespace boost::int128
+    // also finds uint128/int128's own operator<</operator| overloads, and MSVC treats
+    // that as ambiguous with std::_Unsigned128/_Signed128's own hidden-friend
+    // operators. Not needed outside MSVC, where builtin_u128 is a fundamental type
+    // with no user-defined operators to compete with
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_i128() const noexcept { return static_cast<detail::builtin_i128>(boost::int128_detail::builtin128_from_words(high, low)); }
+    BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_u128() const noexcept { return boost::int128_detail::builtin128_from_words(high, low); }
+    #else
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_i128() const noexcept { return static_cast<detail::builtin_i128>(static_cast<detail::builtin_u128>(high) << static_cast<detail::builtin_u128>(64)) | static_cast<detail::builtin_i128>(low); }
-
     BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR operator detail::builtin_u128() const noexcept { return (static_cast<detail::builtin_u128>(high) << static_cast<detail::builtin_u128>(64)) | static_cast<detail::builtin_u128>(low); }
+    #endif
 
     #endif // BOOST_INT128_HAS_INT128
 
@@ -406,6 +448,11 @@ constexpr uint128::operator long double() const noexcept
 // Inverse of operator(Float): decompose f into (high, low) by dividing by 2^64.
 // NaN/negative -> 0
 // overflow -> UINT128_MAX.
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4127) // Conditional expression is constant pre-C++17
+#endif
+
 template <BOOST_INT128_FLOATING_POINT_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr uint128::uint128(Float f) noexcept
 {
@@ -442,6 +489,10 @@ BOOST_INT128_HOST_DEVICE constexpr uint128::uint128(Float f) noexcept
         low = detail::float_to_uint64(remainder);
     }
 }
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 //=====================================
 // Unary Operators
@@ -1150,6 +1201,37 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering oper
     }
 }
 
+// == and < above already have an exact match overload for (uint128, builtin128) in
+// both operand orders (BOOST_INT128_HAS_MSVC_INT128 case), but <=> did not, which is
+// exactly the same gap the operator<</operator>> fix above closes: without an exact
+// match, std::_Unsigned128/_Signed128's own hidden friend operator<=> and this
+// library's operator<=>(uint128, uint128) both need one user-defined conversion, on
+// different arguments, so MSVC ties them (same finding as F12, discovered by the
+// exhaustive builtin128_operators_compile.cpp coverage rather than by a live probe)
+#if defined(BOOST_INT128_HAS_INT128) || defined(BOOST_INT128_HAS_MSVC_INT128)
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const uint128 lhs, const detail::builtin_i128 rhs) noexcept
+{
+    return lhs <=> static_cast<uint128>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const detail::builtin_i128 lhs, const uint128 rhs) noexcept
+{
+    return static_cast<uint128>(lhs) <=> rhs;
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const uint128 lhs, const detail::builtin_u128 rhs) noexcept
+{
+    return lhs <=> static_cast<uint128>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR std::strong_ordering operator<=>(const detail::builtin_u128 lhs, const uint128 rhs) noexcept
+{
+    return static_cast<uint128>(lhs) <=> rhs;
+}
+
+#endif // BOOST_INT128_HAS_INT128
+
 BOOST_INT128_EXPORT template <BOOST_INT128_DEFAULTED_UNSIGNED_INTEGER_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr std::strong_ordering operator<=>(const uint128 lhs, const UnsignedInteger rhs) noexcept
 {
@@ -1487,7 +1569,7 @@ namespace detail {
 template <typename Integer>
 BOOST_INT128_HOST_DEVICE constexpr uint128 default_ls_impl(const uint128 lhs, const Integer rhs) noexcept
 {
-    static_assert(std::is_integral<Integer>::value, "Needs to be a builtin type");
+    static_assert(detail::is_any_integer_v<Integer>, "Needs to be a builtin type");
 
     // A shift by a negative amount or by an amount >= 128 (the operand width) is
     // undefined behavior, exactly as for the built-in shift operators. In a
@@ -1607,17 +1689,48 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator<<(const 
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR detail::builtin_u128 operator<<(const detail::builtin_u128 lhs, const uint128 rhs) noexcept
 {
-    // Out-of-range counts are undefined, matching the built-in operators.
+    // Out-of-range counts are undefined, matching the built-in operators. On MSVC
+    // this is routed through the isolated-namespace helper (see config.hpp) rather
+    // than a plain infix <<, to avoid an ambiguity with this library's own operator<<
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    return boost::int128_detail::builtin128_shl_u(lhs, rhs.low);
+    #else
     return lhs << static_cast<detail::builtin_u128>(rhs.low);
+    #endif
 }
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR detail::builtin_i128 operator<<(const detail::builtin_i128 lhs, const uint128 rhs) noexcept
 {
     // Out-of-range counts are undefined, matching the built-in operators.
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    return static_cast<detail::builtin_i128>(boost::int128_detail::builtin128_shl_u(static_cast<detail::builtin_u128>(lhs), rhs.low));
+    #else
     return lhs << static_cast<detail::builtin_u128>(rhs.low);
+    #endif
 }
 
 #endif
+
+// The count flavor (library type on the left, MSVC's builtin 128-bit type on the right)
+// has no exact match otherwise: std::_Unsigned128/_Signed128's own hidden friend
+// operator<< and uint128's operator<<(uint128, uint128) both need one user-defined
+// conversion, on different arguments, so neither is a better match than the other and
+// MSVC ties them (Boost.Int256 finding F12). is_any_integer_v does not cover MSVC's
+// distinct _Unsigned128/_Signed128 class types, unlike native __int128, so the generic
+// template below never applies to them and this dedicated exact match is required
+#ifdef BOOST_INT128_HAS_MSVC_INT128
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128 operator<<(const uint128 lhs, const detail::builtin_u128 rhs) noexcept
+{
+    return lhs << static_cast<std::uint64_t>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128 operator<<(const uint128 lhs, const detail::builtin_i128 rhs) noexcept
+{
+    return lhs << static_cast<std::uint64_t>(rhs);
+}
+
+#endif // BOOST_INT128_HAS_MSVC_INT128
 
 // A shift takes its value and its result type from the left operand after integral promotion,
 // and only the count from the right, exactly as the builtin does
@@ -1626,7 +1739,10 @@ BOOST_INT128_EXPORT template <typename Integer, std::enable_if_t<detail::is_any_
 BOOST_INT128_HOST_DEVICE constexpr detail::promoted_t<Integer> operator<<(const Integer lhs, const uint128 rhs) noexcept
 {
     // Out-of-range counts are undefined, matching the built-in operators.
-    return static_cast<detail::promoted_t<Integer>>(lhs) << rhs.low;
+    // Shifted in the unsigned domain: a negative left operand then gets the C++20
+    // result in every language mode instead of undefined behavior before C++20
+    using promoted = detail::promoted_t<Integer>;
+    return static_cast<promoted>(static_cast<std::make_unsigned_t<promoted>>(static_cast<promoted>(lhs)) << rhs.low);
 }
 
 template <BOOST_INT128_INTEGER_CONCEPT>
@@ -1743,7 +1859,7 @@ BOOST_INT128_HOST_DEVICE uint128 intrinsic_rs_impl(const uint128 lhs, const Inte
 
 } // namespace detail
 
-BOOST_INT128_EXPORT template <typename Integer, std::enable_if_t<std::is_integral<Integer>::value, bool> = true>
+BOOST_INT128_EXPORT template <BOOST_INT128_DEFAULTED_INTEGER_CONCEPT>
 BOOST_INT128_HOST_DEVICE constexpr uint128 operator>>(const uint128 lhs, const Integer rhs) noexcept
 {
     #ifndef BOOST_INT128_NO_CONSTEVAL_DETECTION
@@ -1775,17 +1891,44 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator>>(const 
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR detail::builtin_u128 operator>>(const detail::builtin_u128 lhs, const uint128 rhs) noexcept
 {
-    // Out-of-range counts are undefined, matching the built-in operators.
+    // Out-of-range counts are undefined, matching the built-in operators. On MSVC
+    // this is routed through the isolated-namespace helper (see config.hpp) rather
+    // than a plain infix >>, to avoid an ambiguity with this library's own operator>>
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    return boost::int128_detail::builtin128_shr_u(lhs, rhs.low);
+    #else
     return lhs >> static_cast<detail::builtin_u128>(rhs.low);
+    #endif
 }
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR detail::builtin_i128 operator>>(const detail::builtin_i128 lhs, const uint128 rhs) noexcept
 {
-    // Out-of-range counts are undefined, matching the built-in operators.
+    // Out-of-range counts are undefined, matching the built-in operators. lhs stays
+    // signed (an arithmetic shift), only the count is unsigned; see builtin128_shr_i
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    return boost::int128_detail::builtin128_shr_i(lhs, rhs.low);
+    #else
     return lhs >> static_cast<detail::builtin_u128>(rhs.low);
+    #endif
 }
 
 #endif
+
+// See the note above the analogous operator<< overloads: MSVC's distinct
+// _Unsigned128/_Signed128 need this dedicated exact match too (Boost.Int256 finding F12)
+#ifdef BOOST_INT128_HAS_MSVC_INT128
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128 operator>>(const uint128 lhs, const detail::builtin_u128 rhs) noexcept
+{
+    return lhs >> static_cast<std::uint64_t>(rhs);
+}
+
+BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128 operator>>(const uint128 lhs, const detail::builtin_i128 rhs) noexcept
+{
+    return lhs >> static_cast<std::uint64_t>(rhs);
+}
+
+#endif // BOOST_INT128_HAS_MSVC_INT128
 
 // A shift takes its value and its result type from the left operand after integral promotion,
 // and only the count from the right, exactly as the builtin does
@@ -2350,7 +2493,11 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator*(const u
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128 operator*(const uint128 lhs, const detail::builtin_i128 rhs) noexcept
 {
     const detail::builtin_u128 rhs_bits {static_cast<detail::builtin_u128>(rhs)};
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    const bool rhs_negative {static_cast<std::int64_t>(static_cast<std::uint64_t>(boost::int128_detail::builtin128_shr_u(rhs_bits, 64U))) < 0};
+    #else
     const bool rhs_negative {static_cast<std::int64_t>(static_cast<std::uint64_t>(rhs_bits >> static_cast<detail::builtin_u128>(64U))) < 0};
+    #endif
     const uint128 rhs_u {rhs_bits};
     const uint128 abs_rhs {rhs_negative ? -rhs_u : rhs_u};
     const uint128 res {lhs * abs_rhs};
@@ -2361,7 +2508,11 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE BOOST_INT128_BUILTIN_CONSTEXPR uint128 operator*(const detail::builtin_i128 lhs, const uint128 rhs) noexcept
 {
     const detail::builtin_u128 lhs_bits {static_cast<detail::builtin_u128>(lhs)};
+    #ifdef BOOST_INT128_HAS_MSVC_INT128
+    const bool lhs_negative {static_cast<std::int64_t>(static_cast<std::uint64_t>(boost::int128_detail::builtin128_shr_u(lhs_bits, 64U))) < 0};
+    #else
     const bool lhs_negative {static_cast<std::int64_t>(static_cast<std::uint64_t>(lhs_bits >> static_cast<detail::builtin_u128>(64U))) < 0};
+    #endif
     const uint128 lhs_u {lhs_bits};
     const uint128 abs_lhs {lhs_negative ? -lhs_u : lhs_u};
     const uint128 res {abs_lhs * rhs};
