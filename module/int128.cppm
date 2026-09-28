@@ -51,6 +51,12 @@ module;
 #include <type_traits>
 #include <utility>
 
+// Unlike its neighbours above, this one is conditional: <stdfloat> only exists from
+// C++23, and only when the standard library ships it.
+#if (__cplusplus > 202002L || (defined(_MSVC_LANG) && _MSVC_LANG > 202002L)) && defined(__has_include) && __has_include(<stdfloat>)
+#include <stdfloat>
+#endif
+
 #endif
 
 #define BOOST_INT128_BUILD_MODULE

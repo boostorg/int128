@@ -1342,7 +1342,7 @@ jobs:
 
       # Puts cl.exe and the MSVC INCLUDE/LIB environment on PATH for the later steps.
       - name: Set up the MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ./.github/actions/setup-msvc
 
       - name: Install toolchain
         shell: pwsh

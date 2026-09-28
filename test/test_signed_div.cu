@@ -55,12 +55,27 @@ int main(void)
     // Allocate the managed output vector C
     cuda_managed_ptr<test_type> output_vector(numElements);
 
-    // Initialize the input vectors
+    // Initialize the input vectors. Avoid zero divisors; use full signed range for both inputs
     boost::random::uniform_int_distribution<test_type> dist {(std::numeric_limits<test_type>::min)(), (std::numeric_limits<test_type>::max)()};
     for (std::size_t i = 0; i < numElements; ++i)
     {
         input_vector[i] = dist(rng);
-        input_vector2[i] = dist(rng);
+        // Ensure non-zero divisor
+        do
+        {
+            input_vector2[i] = dist(rng);
+        } while (input_vector2[i] == 0);
+    }
+
+    // Force the one defined signed overflow (MIN / -1 wraps to MIN) and its
+    // non-overflowing neighbor onto the device path every run, not only when a
+    // random draw happens to land on them.
+    if (numElements > 1)
+    {
+        input_vector[0] = (std::numeric_limits<test_type>::min)();
+        input_vector2[0] = test_type{-1};
+        input_vector[1] = (std::numeric_limits<test_type>::min)();
+        input_vector2[1] = test_type{1};
     }
 
     // Launch the Vector Add CUDA Kernel

@@ -89,6 +89,48 @@ BOOST_int128EST_EXPORT using builtin_u128 = std::_Unsigned128;
 } // namespace int128
 } // namespace boost
 
+// Sidesteps an MSVC ambiguity between uint128/int128's own operator<</operator| and
+// std::_Unsigned128/_Signed128's hidden friends
+#if !defined(BOOST_INT128_BUILD_MODULE) || defined(BOOST_INT128_INTERFACE_UNIT)
+
+namespace boost {
+namespace int128_detail {
+
+BOOST_INT128_BUILTIN_CONSTEXPR std::_Unsigned128 builtin128_from_words(const unsigned long long hi, const unsigned long long lo) noexcept
+{
+    return (static_cast<std::_Unsigned128>(hi) << 64) | static_cast<std::_Unsigned128>(lo);
+}
+
+BOOST_INT128_BUILTIN_CONSTEXPR std::_Unsigned128 builtin128_shr_u(const std::_Unsigned128 v, const unsigned long long amount) noexcept
+{
+    return v >> amount;
+}
+
+BOOST_INT128_BUILTIN_CONSTEXPR std::_Signed128 builtin128_shr_i(const std::_Signed128 v, const unsigned long long amount) noexcept
+{
+    return v >> amount;
+}
+
+BOOST_INT128_BUILTIN_CONSTEXPR std::_Unsigned128 builtin128_shl_u(const std::_Unsigned128 v, const unsigned long long amount) noexcept
+{
+    return v << amount;
+}
+
+BOOST_INT128_BUILTIN_CONSTEXPR std::_Unsigned128 builtin128_and_u(const std::_Unsigned128 v, const std::_Unsigned128 mask) noexcept
+{
+    return v & mask;
+}
+
+BOOST_INT128_BUILTIN_CONSTEXPR std::_Signed128 builtin128_and_i(const std::_Signed128 v, const std::_Signed128 mask) noexcept
+{
+    return v & mask;
+}
+
+} // namespace int128_detail
+} // namespace boost
+
+#endif
+
 #endif // builtin 128-bit detection
 
 // Determine endianness
@@ -210,8 +252,10 @@ BOOST_int128EST_EXPORT using builtin_u128 = std::_Unsigned128;
 #  define BOOST_INT128_HAS_X86_64_DIVQ
 #endif
 
-// The builtin is only constexpr from clang-7 or GCC-10
-#ifdef __has_builtin
+// The builtin is only constexpr from clang-7 or GCC-10. Excluded on the CUDA/SYCL
+// device pass: __has_builtin can report true there while the implementation is
+// host-only, which silently produces a zero result on device (matches int256's F8 fix)
+#if defined(__has_builtin) && !defined(__CUDA_ARCH__) && !defined(__SYCL_DEVICE_ONLY__)
 #  if __has_builtin(__builtin_sub_overflow) && ((defined(__clang__) && __clang_major__ >= 7) || (defined(__GNUC__) && __GNUC__ >= 10))
 #    define BOOST_INT128_HAS_BUILTIN_SUB_OVERFLOW
 #  endif

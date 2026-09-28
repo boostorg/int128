@@ -171,6 +171,7 @@ compile compile_tests/numeric_compile.cpp ;
 compile compile_tests/string_compile.cpp ;
 compile compile_tests/random_compile.cpp ;
 compile compile_tests/utilities_compile.cpp ;
+compile compile_tests/builtin128_operators_compile.cpp ;
 
 compile-fail compile_tests/literals_overflow_fail.cpp ;
 compile-fail compile_tests/literals_base_prefix_fail.cpp ;

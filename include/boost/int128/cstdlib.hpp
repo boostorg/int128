@@ -61,8 +61,9 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr i128div_t div(const int12
         BOOST_INT128_UNREACHABLE;
     }
 
-    const auto abs_lhs {static_cast<uint128>(abs(x))};
-    const auto abs_rhs {static_cast<uint128>(abs(y))};
+    // Explicit types: nvcc 12.8 drops the cast from `const auto x {static_cast<T>(e)}`
+    const uint128 abs_lhs {static_cast<uint128>(abs(x))};
+    const uint128 abs_rhs {static_cast<uint128>(abs(y))};
 
     if (abs_rhs > abs_lhs)
     {

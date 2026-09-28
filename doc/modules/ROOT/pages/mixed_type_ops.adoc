@@ -205,7 +205,7 @@ A division or remainder by zero, and a shift count that is negative or at least 
 
 `uint128 op= int128` needs no dedicated overload: the member `operator@=(uint128)` already exists, and the `int128` right operand converts to `uint128` first (a bit copy), landing directly in the domain the operation runs in.
 
-`int128 op= uint128` is different. Before the right operand could reach `int128`'s own `operator@=(int128)` member, it would first have to convert to `int128`, which is also a bit copy but changes how the value is interpreted for any operation that treats it as a number, division and remainder in particular: `-37 /= uint128{6}` would divide `-37` by the two's-complement reinterpretation of `6`, giving the right answer only by coincidence, and a different answer whenever the `uint128` right operand's top bit is set. `int128` therefore has its own dedicated overload for every compound assignment operator with a `uint128` right operand:
+`int128 op= uint128` is different. Before the right operand could reach `int128`'s own `operator@=(int128)` member, it would first have to convert to `int128`, which is also a bit copy but changes how the value is interpreted for any operation that treats it as a number, division and remainder in particular: `pass:[-37 /= uint128{6}]` would divide `-37` by the two's-complement reinterpretation of `6`, giving the right answer only by coincidence, and a different answer whenever the `uint128` right operand's top bit is set. `int128` therefore has its own dedicated overload for every compound assignment operator with a `uint128` right operand:
 
 [source, c++]
 ----
@@ -225,7 +225,7 @@ Each of `pass:[|=]`, `pass:[&=]`, `pass:[^=]`, `pass:[+=]`, `pass:[-=]`, `pass:[
 [#mixed_ops_floating_point]
 == Operations With Floating-Point Types
 
-`int128` and `uint128` support exactly the operators that the built-in 128-bit integers support with a floating-point operand, in either operand order, for `float`, `double`, and `long double`.
+`int128` and `uint128` support exactly the operators that the built-in 128-bit integers support with a floating-point operand, in either operand order, for `float`, `double`, `long double`, and, where the standard library provides it, a pass:[C++23] `<stdfloat>` extended type (`std::float16_t`, `float32_t`, `float64_t`, `float128_t`, `bfloat16_t`).
 
 The rule is the C++ usual arithmetic conversions: the 128-bit operand is converted to the floating-point type *first*, and the operation is then performed entirely in that floating-point type.
 The result type is the floating-point type, never a 128-bit integer.
@@ -243,6 +243,10 @@ bool d = u < 5.5;      // true
 Because the conversion happens before the operation, and because it is rounded once, to nearest with ties to even, every result is bit-for-bit identical to the corresponding built-in `pass:[__int128]` / `pass:[unsigned __int128]` expression.
 That holds on every platform: where the compiler provides a built-in 128-bit integer the conversion is the compiler's own, and where it does not the portable path rounds identically.
 
+The `<stdfloat>` types are host only, and only available at all under pass:[C++23] or later on a toolchain that actually ships the specific type (GCC 13 and later with libstdc++; as of this writing, libc++ and MSVC's standard library do not yet provide it). Where a type is not available, it simply does not participate in overload resolution here, exactly like any other type the platform lacks: there is no error, just no operator. The conversion to and from these types is correctly rounded exactly as above, so mixing with `std::float16_t` (8-bit significand, no value above 65504 in magnitude) can overflow to infinity where `double` or `long double` would not.
+
+CAUTION: Under `-ffast-math`, `-ffinite-math-only`, or the Intel compiler's default `-fp-model=fast`, the compiler may assume no floating-point operand is ever NaN or infinity, so a conversion *from* one of those values (in either direction of these mixed-type operators) gives unspecified results. Use `-fp-model=precise` with `icpx` when NaN or infinity handling matters.
+
 === Available Operators
 
 [source, c++]
@@ -250,7 +254,8 @@ That holds on every platform: where the compiler provides a built-in 128-bit int
 namespace boost {
 namespace int128 {
 
-// Float is float, double, or long double.
+// Float is float, double, long double, or a <stdfloat> extended type the
+// standard library provides.
 // Every signature below exists for both uint128 and int128.
 
 //=====================================
@@ -337,6 +342,7 @@ For a comparison that is exact for every value, use the xref:utilities.adoc[inte
 
 === Limitations
 
-* `pass:[__float128]` is not supported, even on the platforms where the compiler provides it and allows `pass:[__int128] op pass:[__float128]`. Only `float`, `double`, and `long double` participate.
-* `long double` is unavailable on the CUDA and SYCL device, so the `long double` overloads are not declared when `BOOST_INT128_HAS_GPU_SUPPORT` is defined, matching the xref:uint128.adoc#u128_conversions[conversion operators].
+* `pass:[__float128]` is not supported, even on the platforms where the compiler provides it and allows `pass:[__int128] op pass:[__float128]`. Only `float`, `double`, `long double`, and the `<stdfloat>` extended types participate.
+* `long double` and the `<stdfloat>` extended types are unavailable on the CUDA and SYCL device, so their overloads are not declared when `BOOST_INT128_HAS_GPU_SUPPORT` is defined, matching the xref:uint128.adoc#u128_conversions[conversion operators].
+* A `<stdfloat>` extended type participates only when the current standard library actually ships it (checked per type, via its `__STDCPP_..._T__` macro, never via `__cpp_lib_stdfloat`, which some standard libraries omit even when the header and the type both exist). As of this writing that is GCC 13 and later with libstdc++; libc++ and MSVC's standard library do not yet provide these types.
 * On a platform whose `long double` is IBM double-double, currently ppc64le, `long double` results are reproducible but not bitwise reproducible: that format is not canonical and its arithmetic is not correctly rounded, so two expressions computing the same product can differ in the last bits. `float` and `double` are unaffected, and so is every other `long double` format.

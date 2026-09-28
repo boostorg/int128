@@ -1,0 +1,35 @@
+# Copyright 2026 Matt Borland
+# Distributed under the Boost Software License, Version 1.0.
+# https://www.boost.org/LICENSE_1_0.txt
+#
+# Loads the MSVC developer environment (cl.exe on PATH, INCLUDE, LIB) for the later
+# steps of a job, without a third party JavaScript action. Only the variables that
+# vcvarsall.bat changes are exported, so the runner's own variables stay intact.
+
+name: Setup MSVC developer environment
+description: Runs vcvarsall.bat and exports the resulting environment to later steps
+inputs:
+  arch:
+    description: Target architecture passed to vcvarsall.bat (x64, x86, arm64, ...)
+    required: false
+    default: x64
+runs:
+  using: composite
+  steps:
+    - name: Setup MSVC developer environment
+      shell: pwsh
+      env:
+        MSVC_ARCH: ${{ inputs.arch }}
+      run: |
+        $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
+        if (-not $vs) { throw "No Visual Studio installation found" }
+        $before = @{}
+        Get-ChildItem env: | ForEach-Object { $before[$_.Name] = $_.Value }
+        # The leading call keeps cmd from stripping the quotes around the path.
+        $after = cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" $env:MSVC_ARCH >nul && where cl >nul && set"
+        if ($LASTEXITCODE -ne 0) { throw "vcvarsall.bat $env:MSVC_ARCH failed" }
+        foreach ($line in $after) {
+          if ($line -match '^([^=]+)=(.*)$' -and $before[$Matches[1]] -cne $Matches[2]) {
+            "$($Matches[1])=$($Matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
+        }

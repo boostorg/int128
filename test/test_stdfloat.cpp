@@ -35,6 +35,12 @@
 #  endif
 #endif
 
+#if __cplusplus > 202002L || (defined(_MSVC_LANG) && _MSVC_LANG > 202002L)
+#define BOOST_INT128_TEST_STDFLOAT_CPP23 1
+#endif
+
+#ifdef BOOST_INT128_TEST_STDFLOAT_CPP23
+
 // See test_float_conversion.cpp (the same rationale applies verbatim): a 32-bit x87
 // build can keep an intermediate in an 80-bit register, and -ffast-math lets the
 // optimizer assume neither infinity nor NaN occurs.
@@ -417,6 +423,17 @@ int main()
 
     return boost::report_errors();
 }
+
+#else // BOOST_INT128_TEST_STDFLOAT_CPP23
+
+int main()
+{
+    BOOST_TEST(true);
+
+    return boost::report_errors();
+}
+
+#endif // BOOST_INT128_TEST_STDFLOAT_CPP23
 
 #if defined(__clang__)
 #  pragma clang diagnostic pop
