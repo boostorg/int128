@@ -83,6 +83,7 @@ run test_builtin_parity.cpp ;
 run test_float_mixed_ops.cpp ;
 run test_integer_mixed_ops.cpp ;
 run test_float_conversion.cpp ;
+run test_stdfloat.cpp ;
 
 run test_consteval_funcs.cpp ;
 run test_sign_compare.cpp ;
@@ -170,6 +171,7 @@ compile compile_tests/numeric_compile.cpp ;
 compile compile_tests/string_compile.cpp ;
 compile compile_tests/random_compile.cpp ;
 compile compile_tests/utilities_compile.cpp ;
+compile compile_tests/builtin128_operators_compile.cpp ;
 
 compile-fail compile_tests/literals_overflow_fail.cpp ;
 compile-fail compile_tests/literals_base_prefix_fail.cpp ;

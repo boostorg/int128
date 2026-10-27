@@ -207,7 +207,7 @@ ckd_mul<uint8_t>(20, 20): overflow=true, wrapped=144
 They are available in C++14 and later.
 
 Unlike the built-in relational operators, which follow the usual arithmetic conversions, these functions compare the true mathematical values of their operands regardless of signedness.
-When a `uint128` is compared with an `int128`, the operators convert the signed operand to unsigned, so `int128{-1} < uint128{0}` is reported as `false` and `(std::numeric_limits<uint128>::max)() == int128{-1}` as `true`.
+When a `uint128` is compared with an `int128`, the operators convert the signed operand to unsigned, so `pass:[int128{-1} < uint128{0}]` is reported as `false` and `pass:[(std::numeric_limits<uint128>::max)() == int128{-1}]` as `true`.
 The `cmp_*` functions report the mathematically correct answer in both cases.
 
 Throughout this section a *128-bit type* is `int128`, `uint128`, or a builtin 128-bit type where the platform provides one (`+__int128+` and its unsigned counterpart, or `std::_Signed128` and `std::_Unsigned128` on MSVC).

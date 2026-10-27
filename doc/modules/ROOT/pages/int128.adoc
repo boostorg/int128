@@ -208,8 +208,12 @@ All conversion operators except `operator bool()` are implicit to match the beha
 Conversions to unsigned integers are subject to mixed sign limitations discussed xref:int128.adoc#i128_operator_behavior[above].
 Conversions to floating-point types may not be lossless depending on the value of the `int128` at time of conversion,
 as the number of digits it represents can exceed the precision of the significand in floating point types.
-When the value does not fit the significand it is rounded once, to nearest with ties to even, which is the same result `static_cast<__int128>` produces, and a value above the range of the target type becomes infinity.
+When the value does not fit the significand it is rounded once, to nearest with ties to even, which is the same result `static_cast<__int128>` produces, and a value above the range of the target type becomes infinity of the matching sign.
 This holds whether or not the compiler provides a built-in 128-bit integer: where it does the conversion is the compiler's own, and where it does not the portable path rounds identically.
+
+`int128` also converts to a pass:[C++23] `<stdfloat>` extended type (`std::float16_t`, `float32_t`, `float64_t`, `float128_t`, `bfloat16_t`) when the standard library provides it: host only, and only under pass:[C++23] or later on a toolchain whose standard library actually ships `<stdfloat>` with that specific type (GCC 13 and later with libstdc++; as of this writing, libc++ and MSVC's standard library do not yet provide it, so those types are simply absent from `int128` there, not merely disabled). The conversion is correctly rounded exactly as above, so the narrowest of these, `std::float16_t` (8-bit significand, no value above 65504 in magnitude), overflows to an infinity of the matching sign for any `int128` past that point.
+
+CAUTION: Under `-ffast-math`, `-ffinite-math-only`, or the Intel compiler's default `-fp-model=fast`, the compiler may assume no floating-point operand is ever NaN or infinity, so a conversion *from* one of those values gives unspecified results. Use `-fp-model=precise` with `icpx` when NaN or infinity handling matters.
 
 [#i128_comparison_operators]
 == Comparison Operators

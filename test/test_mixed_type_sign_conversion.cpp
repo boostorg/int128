@@ -65,12 +65,88 @@ void test()
     }
 }
 
+void test_compound_assignment()
+{
+    using boost::int128::detail::builtin_u128;
+
+    for (std::size_t i {0}; i < N; ++i)
+    {
+        auto i_val {i_dist(rng)};
+        if (i_val > 0)
+        {
+            i_val = -i_val;  // force the left operand negative every iteration
+        }
+        if (i_val == 0)
+        {
+            continue;
+        }
+
+        auto u_val {u_dist(rng)};
+        if (u_val == 0)
+        {
+            continue;  // skip divide/modulo by zero
+        }
+
+        const uint128 rhs_u {u_val};
+        const builtin_u128 builtin_rhs {u_val};
+
+        #define BOOST_INT128_CHECK_COMPOUND(op) \
+        { \
+            int128 lhs_i {i_val}; \
+            lhs_i op rhs_u; \
+            builtin_u128 builtin_lhs = static_cast<builtin_u128>(static_cast<__int128>(i_val)); \
+            builtin_lhs op builtin_rhs; \
+            BOOST_TEST_EQ(lhs_i, int128{builtin_lhs}); \
+        }
+
+        BOOST_INT128_CHECK_COMPOUND(|=)
+        BOOST_INT128_CHECK_COMPOUND(&=)
+        BOOST_INT128_CHECK_COMPOUND(^=)
+        BOOST_INT128_CHECK_COMPOUND(+=)
+        BOOST_INT128_CHECK_COMPOUND(-=)
+        BOOST_INT128_CHECK_COMPOUND(*=)
+        BOOST_INT128_CHECK_COMPOUND(/=)
+        BOOST_INT128_CHECK_COMPOUND(%=)
+
+        #undef BOOST_INT128_CHECK_COMPOUND
+
+        // Shifts are the exception: value and result type come from the int128 lhs
+        // (>> stays arithmetic), and only the count comes from the uint128 rhs, so the
+        // reference is int128's own shift, not the uint128 magnitude's logical one.
+        {
+            int128 lhs_shl {i_val};
+            const uint128 count {3U};
+            lhs_shl <<= count;
+            BOOST_TEST_EQ(lhs_shl, int128{i_val} << count);
+        }
+        {
+            int128 lhs_shr {i_val};
+            const uint128 count {3U};
+            lhs_shr >>= count;
+            BOOST_TEST_EQ(lhs_shr, int128{i_val} >> count);
+        }
+
+        // uint128 /= int128 needs no dedicated overload: it already resolves through
+        // the member, converting the int128 operand to uint128 first (a bit copy that
+        // lands directly in the domain the operation runs in), matching the builtin.
+        {
+            uint128 lhs_div {rhs_u};
+            const int128 rhs_i {i_val};
+            lhs_div /= rhs_i;
+            builtin_u128 builtin_div {builtin_rhs};
+            builtin_div /= static_cast<builtin_u128>(static_cast<__int128>(i_val));
+            BOOST_TEST_EQ(lhs_div, uint128{builtin_div});
+        }
+    }
+}
+
 #endif // BOOST_INT128_HAS_INT128
 
 int main()
 {
 #ifdef BOOST_INT128_HAS_INT128
     test();
+    test_compound_assignment();
 #endif
 
     return boost::report_errors();

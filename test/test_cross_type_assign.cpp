@@ -10,7 +10,7 @@
 #include <cmath>
 
 #ifdef __has_include
-#  if __has_include(<stdfloat>)
+#  if (__cplusplus > 202002L || (defined(_MSVC_LANG) && _MSVC_LANG > 202002L)) && __has_include(<stdfloat>)
 #    include <stdfloat>
 #  endif
 #endif
@@ -268,24 +268,70 @@ void test_constexpr_float_construction()
     // constexpr contexts.
 }
 
-// The extended floating point types cannot hold the 2^64 scale factor the constructor needs,
-// so they are excluded from detail::is_floating_point_v and reach the constructor through the
-// promotion to float instead. std::is_floating_point is true for them in C++23, and using it
-// here used to yield 2^63 for every value
 void test_extended_float_construction()
 {
-    #ifdef __cpp_lib_stdfloat
+    #ifdef __STDCPP_FLOAT16_T__
 
-    const uint128 u {std::float16_t{3}};
-    BOOST_TEST_EQ(u, uint128{3});
+    const uint128 u16 {std::float16_t{3}};
+    BOOST_TEST_EQ(u16, uint128{3});
 
-    const int128 i {std::float16_t{-3}};
-    BOOST_TEST_EQ(i, int128{-3});
+    const int128 i16 {std::float16_t{-3}};
+    BOOST_TEST_EQ(i16, int128{-3});
 
-    static_assert(std::is_same<decltype(uint128{} + std::float16_t{}), float>::value,
-                  "an extended float operand promotes to float");
+    static_assert(std::is_same<decltype(uint128{} + std::float16_t{}), std::float16_t>::value,
+                  "an extended float operand keeps its own type as the result type");
 
-    #endif // __cpp_lib_stdfloat
+    // A value beyond float16_t's range (65504) converts to infinity, not UB
+    const uint128 big {UINT64_C(0), UINT64_C(1000000)};
+    BOOST_TEST(std::isinf(static_cast<float>(static_cast<std::float16_t>(big))));
+
+    #endif // __STDCPP_FLOAT16_T__
+
+    #ifdef __STDCPP_BFLOAT16_T__
+
+    const uint128 ub {std::bfloat16_t{5}};
+    BOOST_TEST_EQ(ub, uint128{5});
+
+    const int128 ib {std::bfloat16_t{-5}};
+    BOOST_TEST_EQ(ib, int128{-5});
+
+    #endif // __STDCPP_BFLOAT16_T__
+
+    #ifdef __STDCPP_FLOAT32_T__
+
+    const uint128 u32 {std::float32_t{7}};
+    BOOST_TEST_EQ(u32, uint128{7});
+
+    const int128 i32 {std::float32_t{-7}};
+    BOOST_TEST_EQ(i32, int128{-7});
+
+    #endif // __STDCPP_FLOAT32_T__
+
+    #ifdef __STDCPP_FLOAT64_T__
+
+    const uint128 u64 {std::float64_t{9}};
+    BOOST_TEST_EQ(u64, uint128{9});
+
+    const int128 i64 {std::float64_t{-9}};
+    BOOST_TEST_EQ(i64, int128{-9});
+
+    #endif // __STDCPP_FLOAT64_T__
+
+    #ifdef __STDCPP_FLOAT128_T__
+
+    const uint128 u128 {std::float128_t{11}};
+    BOOST_TEST_EQ(u128, uint128{11});
+
+    const int128 i128v {std::float128_t{-11}};
+    BOOST_TEST_EQ(i128v, int128{-11});
+
+    // MIN round trips exactly through the wide-significand (113 digit) path
+    constexpr auto mn {(std::numeric_limits<int128>::min)()};
+    const auto as_f128 {static_cast<std::float128_t>(mn)};
+    const auto back {static_cast<int128>(as_f128)};
+    BOOST_TEST_EQ(back, mn);
+
+    #endif // __STDCPP_FLOAT128_T__
 }
 
 int main()

@@ -206,7 +206,7 @@ jobs:
         run: git clone --depth 1 --branch "$ABSEIL_TAG" https://github.com/abseil/abseil-cpp.git ../abseil-cpp
       - name: Setup Boost
         run: .github/scripts/setup_benchmarks.sh
-      - uses: TheMrMilchmann/setup-msvc-dev@v4
+      - uses: ./.github/actions/setup-msvc
         with:
           arch: ${{ matrix.msvc_arch }}
       - name: Build and run
