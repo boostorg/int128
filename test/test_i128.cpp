@@ -1128,6 +1128,47 @@ void test_abs()
     }
 }
 
+// Exercises unary minus where the low word is zero, which the random parity tests
+// almost never reach, plus the values at both ends of the range
+void test_spot_unary_minus()
+{
+    using boost::int128::int128;
+    using boost::int128::detail::from_bits;
+
+    constexpr auto min_val {std::numeric_limits<int128>::min()};
+    constexpr auto max_val {std::numeric_limits<int128>::max()};
+
+    static_assert(-int128{0} == 0, "-0");
+    static_assert(-int128{1} == -1, "-1");
+    static_assert(-int128{-1} == 1, "-(-1)");
+    static_assert(-max_val == min_val + 1, "-max");
+    static_assert(-min_val == min_val, "-min");
+    static_assert(-from_bits(UINT64_MAX, UINT64_C(0)) == from_bits(UINT64_C(1), UINT64_C(0)), "-(-2^64)");
+    static_assert(-from_bits(UINT64_C(1), UINT64_C(0)) == from_bits(UINT64_MAX, UINT64_C(0)), "-(2^64)");
+
+    struct case_t { std::uint64_t high; std::uint64_t low; std::uint64_t neg_high; std::uint64_t neg_low; };
+    constexpr case_t cases[] {
+        {UINT64_C(0), UINT64_C(0), UINT64_C(0), UINT64_C(0)},
+        {UINT64_C(0), UINT64_C(1), UINT64_MAX, UINT64_MAX},
+        {UINT64_C(0), UINT64_MAX, UINT64_MAX, UINT64_C(1)},
+        {UINT64_C(1), UINT64_C(0), UINT64_MAX, UINT64_C(0)},
+        {UINT64_MAX, UINT64_C(0), UINT64_C(1), UINT64_C(0)},
+        {UINT64_C(0x8000000000000000), UINT64_C(0), UINT64_C(0x8000000000000000), UINT64_C(0)},
+        {UINT64_C(0x8000000000000000), UINT64_C(1), UINT64_C(0x7FFFFFFFFFFFFFFF), UINT64_MAX},
+        {UINT64_C(0x7FFFFFFFFFFFFFFF), UINT64_MAX, UINT64_C(0x8000000000000000), UINT64_C(1)},
+        {UINT64_C(0x123456789ABCDEF0), UINT64_C(0), UINT64_C(0xEDCBA98765432110), UINT64_C(0)},
+        {UINT64_C(0x123456789ABCDEF0), UINT64_C(0x0FEDCBA987654321), UINT64_C(0xEDCBA9876543210F), UINT64_C(0xF0123456789ABCDF)},
+    };
+
+    for (const auto& c : cases)
+    {
+        const auto value {from_bits(c.high, c.low)};
+        BOOST_TEST(-value == from_bits(c.neg_high, c.neg_low));
+        BOOST_TEST(-(-value) == value);
+        BOOST_TEST(-value == int128{0} - value);
+    }
+}
+
 // Exercises the branch-free abs edge cases: the low-word borrow, and the two values
 // whose magnitude is not representable
 void test_spot_abs()
@@ -1304,6 +1345,7 @@ int main()
 
     boost::mp11::mp_for_each<test_types>(test_caller());
 
+    test_spot_unary_minus();
     test_spot_abs();
 
     // MSVC std::_Signed128 does not provide a float conversion operator

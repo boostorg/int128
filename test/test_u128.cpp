@@ -1231,6 +1231,42 @@ void test_operator_mod()
     }
 }
 
+// Exercises unary minus where the low word is zero, which the random parity tests
+// almost never reach, plus the values at both ends of the range
+void test_spot_unary_minus()
+{
+    using boost::int128::uint128;
+
+    constexpr auto max_val {std::numeric_limits<uint128>::max()};
+
+    static_assert(-uint128{0} == 0, "-0");
+    static_assert(-uint128{1} == max_val, "-1");
+    static_assert(-max_val == 1, "-max");
+    static_assert(-uint128{UINT64_MAX, UINT64_C(0)} == uint128{UINT64_C(1), UINT64_C(0)}, "-(2^128 - 2^64)");
+    static_assert(-uint128{UINT64_C(1), UINT64_C(0)} == uint128{UINT64_MAX, UINT64_C(0)}, "-(2^64)");
+
+    struct case_t { std::uint64_t high; std::uint64_t low; std::uint64_t neg_high; std::uint64_t neg_low; };
+    constexpr case_t cases[] {
+        {UINT64_C(0), UINT64_C(0), UINT64_C(0), UINT64_C(0)},
+        {UINT64_C(0), UINT64_C(1), UINT64_MAX, UINT64_MAX},
+        {UINT64_C(0), UINT64_MAX, UINT64_MAX, UINT64_C(1)},
+        {UINT64_C(1), UINT64_C(0), UINT64_MAX, UINT64_C(0)},
+        {UINT64_MAX, UINT64_C(0), UINT64_C(1), UINT64_C(0)},
+        {UINT64_C(0x8000000000000000), UINT64_C(0), UINT64_C(0x8000000000000000), UINT64_C(0)},
+        {UINT64_MAX, UINT64_MAX, UINT64_C(0), UINT64_C(1)},
+        {UINT64_C(0x123456789ABCDEF0), UINT64_C(0), UINT64_C(0xEDCBA98765432110), UINT64_C(0)},
+        {UINT64_C(0x123456789ABCDEF0), UINT64_C(0x0FEDCBA987654321), UINT64_C(0xEDCBA9876543210F), UINT64_C(0xF0123456789ABCDF)},
+    };
+
+    for (const auto& c : cases)
+    {
+        const uint128 value {c.high, c.low};
+        BOOST_TEST(-value == uint128(c.neg_high, c.neg_low));
+        BOOST_TEST(-(-value) == value);
+        BOOST_TEST(-value == uint128{0} - value);
+    }
+}
+
 template <typename IntType>
 void test_spot_div(IntType value, IntType value2)
 {
@@ -1332,6 +1368,8 @@ int main()
     >;
 
     boost::mp11::mp_for_each<test_types>(test_caller());
+
+    test_spot_unary_minus();
 
     // MSVC does not provide a float conversion operator
     #ifndef BOOST_INT128_HAS_MSVC_INT128
