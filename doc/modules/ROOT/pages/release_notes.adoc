@@ -28,6 +28,18 @@ All 10 compound assignment operators (`pass:[|=]`, `pass:[&=]`, `pass:[^=]`, `pa
 * `operator<<` ignored `std::setw`/`std::setfill` entirely; the requested width was never consumed and no padding was ever written. `std::left`, `std::right`, and `std::internal` are now honored exactly as they are for the built-in integer types, with `std::internal` placing the fill between the sign/base-prefix and the digits (`pass:[std::setw(12) << std::internal << std::hex << std::showbase << int128{-255}]` now prints `"-0x       ff"`, not the unpadded `"-0xff"` it printed before). `std::showpos` now also prints a leading `+` for a non-negative `int128` in decimal, matching the built-in signed types.
 * The quoted-string and macro forms of an `int128` literal (`"-170141183460469231731687303715884105728"_i128`, `BOOST_INT128_INT128_C(-170141183460469231731687303715884105728)`, and the equivalent hex spellings) now correctly parse to `BOOST_INT128_INT128_MIN`. These forms range-check the *signed* value directly (a magnitude up to `2^127^` is allowed when the sign is negative), unlike a raw unquoted `_i128` literal, which never sees the sign at all (`-X_i128` is unary minus applied to `X_i128`) and so can never reach `MIN` this way, exactly as int256's `_i256` already documents.
 
+=== Performance: vectorizable addition and subtraction, branch-free negation
+
+Fixes https://github.com/boostorg/int128/issues/523[#523] and https://github.com/boostorg/int128/issues/524[#524].
+
+* On x86-64 with GCC 14 or later and with Clang, `operator+` and `operator-` between two `int128` or two `uint128` values now spell the carry as a plain comparison.
+The compilers still emit `add`/`adc` and `sub`/`sbb` for scalar code, and can now vectorize loops over these types with AVX2 and AVX-512.
+The previous paths, through the native 128-bit type or the overflow builtins, kept such loops scalar, and with GCC 14 and `-march=native` they spilled every result through the stack, which made loops about ten times slower.
+GCC 13 and earlier keep the previous code, since they do not turn the comparison back into `adc`/`sbb` inside loops.
+ARM64 keeps the previous code as well: a NEON register holds only one 128-bit value, and the vectorized loops measured up to twice as slow as scalar ones.
+* Unary minus of `int128` no longer compiles to a conditional branch with GCC, which made negating unpredictable data almost four times slower.
+Both types now use a branch-free form chosen per compiler and target, which is also faster for `uint128` on ARM64.
+
 === New: C++23 `<stdfloat>` support
 
 Fixes https://github.com/boostorg/int128/issues/513[#513]. `uint128` and `int128` now construct from, convert to, and support mixed arithmetic, comparison, and compound assignment with the pass:[C++23] `<stdfloat>` extended floating-point types: `std::float16_t`, `float32_t`, `float64_t`, `float128_t`, and `bfloat16_t`.

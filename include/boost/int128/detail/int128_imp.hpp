@@ -10,6 +10,7 @@
 #include <boost/int128/detail/traits.hpp>
 #include <boost/int128/detail/constants.hpp>
 #include <boost/int128/detail/clz.hpp>
+#include <boost/int128/detail/common_add.hpp>
 #include <boost/int128/detail/common_mul.hpp>
 #include <boost/int128/detail/common_div.hpp>
 #include <boost/int128/detail/float_conversion.hpp>
@@ -489,10 +490,16 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 operator+(const in
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr int128 operator-(const int128 value) noexcept
 {
-    // Spelled with the constructor rather than from_bits: clang folds the low word
-    // of the low == 0 arm away here, and loses that if the members are written.
-    return (value.low == 0) ? int128{static_cast<std::int64_t>(UINT64_C(0) - value.high), 0} :
-                              int128{static_cast<std::int64_t>(~value.high), ~value.low + 1};
+    #if defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__) && defined(BOOST_INT128_HAS_INT128)
+
+    // GCC lowers this to negs/ngc; unsigned domain so that min() wraps to itself
+    return int128{UINT64_C(0) - static_cast<detail::builtin_u128>(value)};
+
+    #else
+
+    return detail::from_bits(detail::negate_high_word(value.high, value.low), UINT64_C(0) - value.low);
+
+    #endif
 }
 
 //=====================================
@@ -1804,7 +1811,12 @@ BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr int128 library_add(
 
 BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr int128 default_add(const int128 lhs, const int128 rhs) noexcept
 {
-    #if (defined(__x86_64__) || (defined(__aarch64__) && !defined(__APPLE__))) && !defined(_WIN32) && defined(BOOST_INT128_HAS_INT128)
+    #if defined(BOOST_INT128_HAS_VECTORIZABLE_ADD)
+
+    const auto new_low {lhs.low + rhs.low};
+    return detail::from_bits(lhs.high + rhs.high + detail::add_carry_word(lhs.low, rhs.low, new_low), new_low);
+
+    #elif (defined(__x86_64__) || (defined(__aarch64__) && !defined(__APPLE__))) && !defined(_WIN32) && defined(BOOST_INT128_HAS_INT128)
 
     // Compute in the unsigned domain so that overflow wraps modulo 2^128
     return int128{static_cast<detail::builtin_u128>(lhs) + static_cast<detail::builtin_u128>(rhs)};
@@ -1859,7 +1871,12 @@ BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr int128 library_sub(
 
 BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr int128 default_sub(const int128 lhs, const int128 rhs) noexcept
 {
-    #if defined(BOOST_INT128_HAS_BUILTIN_SUB_OVERFLOW) && (!defined(__aarch64__) || defined(__APPLE__) || !defined(BOOST_INT128_HAS_INT128)) && !(defined(__CUDACC__) && defined(BOOST_INT128_ENABLE_CUDA))
+    #if defined(BOOST_INT128_HAS_VECTORIZABLE_ADD)
+
+    const auto new_low {lhs.low - rhs.low};
+    return detail::from_bits(lhs.high - rhs.high - static_cast<std::uint64_t>(new_low > lhs.low), new_low);
+
+    #elif defined(BOOST_INT128_HAS_BUILTIN_SUB_OVERFLOW) && (!defined(__aarch64__) || defined(__APPLE__) || !defined(BOOST_INT128_HAS_INT128)) && !(defined(__CUDACC__) && defined(BOOST_INT128_ENABLE_CUDA))
 
     // __builtin_sub_overflow is marked constexpr so we don't need if consteval handling
     std::uint64_t result_low {};

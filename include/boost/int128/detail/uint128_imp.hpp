@@ -10,6 +10,7 @@
 #include <boost/int128/detail/traits.hpp>
 #include <boost/int128/detail/constants.hpp>
 #include <boost/int128/detail/clz.hpp>
+#include <boost/int128/detail/common_add.hpp>
 #include <boost/int128/detail/common_mul.hpp>
 #include <boost/int128/detail/common_div.hpp>
 #include <boost/int128/detail/float_conversion.hpp>
@@ -505,7 +506,16 @@ BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator+(const u
 
 BOOST_INT128_EXPORT BOOST_INT128_HOST_DEVICE constexpr uint128 operator-(const uint128 value) noexcept
 {
-    return {~value.high + static_cast<std::uint64_t>(value.low == UINT64_C(0)), ~value.low + UINT64_C(1)};
+    #if defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__) && defined(BOOST_INT128_HAS_INT128)
+
+    // GCC lowers this to negs/ngc
+    return static_cast<uint128>(UINT64_C(0) - static_cast<detail::builtin_u128>(value));
+
+    #else
+
+    return {detail::negate_high_word(value.high, value.low), UINT64_C(0) - value.low};
+
+    #endif
 }
 
 //=====================================
@@ -2014,7 +2024,12 @@ namespace impl {
 
 BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr uint128 default_add(const uint128 lhs, const uint128 rhs) noexcept
 {
-    #if defined(BOOST_INT128_HAS_BUILTIN_ADD_OVERFLOW) && (defined(__i386__) || (defined(__aarch64__) && !defined(__APPLE__)) || defined(__arm__) || (defined(__s390__) || defined(__s390x__)))
+    #if defined(BOOST_INT128_HAS_VECTORIZABLE_ADD)
+
+    const auto new_low {lhs.low + rhs.low};
+    return {lhs.high + rhs.high + detail::add_carry_word(lhs.low, rhs.low, new_low), new_low};
+
+    #elif defined(BOOST_INT128_HAS_BUILTIN_ADD_OVERFLOW) && (defined(__i386__) || (defined(__aarch64__) && !defined(__APPLE__)) || defined(__arm__) || (defined(__s390__) || defined(__s390x__)))
 
     uint128 res {};
     res.high = lhs.high + rhs.high + __builtin_add_overflow(lhs.low, rhs.low, &res.low);
@@ -2064,7 +2079,12 @@ BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr uint128 default_add
 
 BOOST_INT128_HOST_DEVICE BOOST_INT128_FORCE_INLINE constexpr uint128 default_sub(const uint128 lhs, const uint128 rhs) noexcept
 {
-    #if defined(BOOST_INT128_HAS_BUILTIN_SUB_OVERFLOW) && (defined(__i386__) || defined(__arm__) || (defined(__s390__) || defined(__s390x__)))
+    #if defined(BOOST_INT128_HAS_VECTORIZABLE_ADD)
+
+    const auto new_low {lhs.low - rhs.low};
+    return {lhs.high - rhs.high - static_cast<std::uint64_t>(new_low > lhs.low), new_low};
+
+    #elif defined(BOOST_INT128_HAS_BUILTIN_SUB_OVERFLOW) && (defined(__i386__) || defined(__arm__) || (defined(__s390__) || defined(__s390x__)))
 
     uint128 res {};
     res.high = lhs.high - rhs.high - __builtin_sub_overflow(lhs.low, rhs.low, &res.low);
